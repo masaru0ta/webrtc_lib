@@ -1,6 +1,13 @@
 # webrtc_lib
 
+https://github.com/masaru0ta/webRTC_GAS
+上記の GAS API を使うための Javascript ライブラリです。
 
+ここでは GAS のコードは作成・管理しません。
+ライブラリだけパブリックにするためにリポジトリを分けています。
+
+https://github.com/masaru0ta/webRTC_GAS/tree/main/src/lib
+から Javascript のソースを持ってきてプッシュする。
 
 ## YOU MUST: 
 - 回答は日本語で行うこと
