@@ -471,6 +471,14 @@
       // 描画
       draw();
 
+      // デバッグ: 衝突判定用の情報を表示
+      ctx.fillStyle = '#ffff00';
+      ctx.font = '10px Arial';
+      ctx.fillText(`isHost: ${isHost}`, 5, 15);
+      ctx.fillText(`myPaddle: ${Math.round(myPaddleX)},${Math.round(myPaddleY)}`, 5, 27);
+      ctx.fillText(`oppPaddle: ${Math.round(opponentPaddleX)},${Math.round(opponentPaddleY)}`, 5, 39);
+      ctx.fillText(`puck: ${Math.round(puck.x)},${Math.round(puck.y)} v:${puck.vx.toFixed(1)},${puck.vy.toFixed(1)}`, 5, 51);
+
       animationId = requestAnimationFrame(gameLoop);
     }
 
