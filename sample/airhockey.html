@@ -567,16 +567,25 @@
         puck.x += nx * overlap;
         puck.y += ny * overlap;
 
-        // 反射ベクトルを計算
-        const dot = puck.vx * nx + puck.vy * ny;
-        puck.vx = puck.vx - 2 * dot * nx;
-        puck.vy = puck.vy - 2 * dot * ny;
-
-        // 速度を正規化して一定速度を維持
+        // パックの速度を計算
         const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-        if (speed > 0) {
-          puck.vx = (puck.vx / speed) * PUCK_SPEED * 1.1; // 少し加速
-          puck.vy = (puck.vy / speed) * PUCK_SPEED * 1.1;
+
+        if (speed < 0.1) {
+          // パックが静止している場合、パドルから離れる方向に発射
+          puck.vx = nx * PUCK_SPEED;
+          puck.vy = ny * PUCK_SPEED;
+        } else {
+          // 反射ベクトルを計算
+          const dot = puck.vx * nx + puck.vy * ny;
+          puck.vx = puck.vx - 2 * dot * nx;
+          puck.vy = puck.vy - 2 * dot * ny;
+
+          // 速度を正規化して一定速度を維持
+          const newSpeed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+          if (newSpeed > 0) {
+            puck.vx = (puck.vx / newSpeed) * PUCK_SPEED * 1.1;
+            puck.vy = (puck.vy / newSpeed) * PUCK_SPEED * 1.1;
+          }
         }
       }
     }
