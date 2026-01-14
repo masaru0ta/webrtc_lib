@@ -434,14 +434,8 @@
     function resetPuck() {
       puck.x = CANVAS_WIDTH / 2;
       puck.y = CANVAS_HEIGHT / 2;
-
-      if (isHost) {
-        // ランダムな方向に発射
-        const angle = (Math.random() * Math.PI / 2) - Math.PI / 4; // -45度〜45度
-        const direction = Math.random() < 0.5 ? 1 : -1; // 上か下
-        puck.vx = Math.sin(angle) * PUCK_SPEED;
-        puck.vy = Math.cos(angle) * PUCK_SPEED * direction;
-      }
+      puck.vx = 0;
+      puck.vy = 0;
     }
 
     function updateScoreDisplay() {
