@@ -512,33 +512,31 @@
     // ゲスト用：パック移動予測（滑らかな表示用）
     // ========================================
     function updatePuckPrediction() {
-      // サーバー位置も速度で更新（予測）
-      serverPuck.x += serverPuck.vx;
-      serverPuck.y += serverPuck.vy;
+      // 速度に基づいて位置をシミュレーション
+      puck.x += puck.vx;
+      puck.y += puck.vy;
 
-      // サーバー位置の壁反射（予測）
-      if (serverPuck.x - PUCK_RADIUS <= 0) {
-        serverPuck.x = PUCK_RADIUS;
-        serverPuck.vx = -serverPuck.vx;
-      } else if (serverPuck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
-        serverPuck.x = CANVAS_WIDTH - PUCK_RADIUS;
-        serverPuck.vx = -serverPuck.vx;
+      // 壁との衝突処理
+      if (puck.x - PUCK_RADIUS <= 0) {
+        puck.x = PUCK_RADIUS;
+        puck.vx = -puck.vx;
+      } else if (puck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
+        puck.x = CANVAS_WIDTH - PUCK_RADIUS;
+        puck.vx = -puck.vx;
       }
-      if (serverPuck.y - PUCK_RADIUS <= 0) {
-        serverPuck.y = PUCK_RADIUS;
-        serverPuck.vy = -serverPuck.vy;
-      } else if (serverPuck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
-        serverPuck.y = CANVAS_HEIGHT - PUCK_RADIUS;
-        serverPuck.vy = -serverPuck.vy;
+      if (puck.y - PUCK_RADIUS <= 0) {
+        puck.y = PUCK_RADIUS;
+        puck.vy = -puck.vy;
+      } else if (puck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
+        puck.y = CANVAS_HEIGHT - PUCK_RADIUS;
+        puck.vy = -puck.vy;
       }
 
-      // 現在位置をサーバー位置に向かって滑らかに補間
-      puck.x += (serverPuck.x - puck.x) * INTERPOLATION_FACTOR;
-      puck.y += (serverPuck.y - puck.y) * INTERPOLATION_FACTOR;
-
-      // 速度も補間（急な変化を避ける）
-      puck.vx += (serverPuck.vx - puck.vx) * INTERPOLATION_FACTOR;
-      puck.vy += (serverPuck.vy - puck.vy) * INTERPOLATION_FACTOR;
+      // ホストからの正しい位置との差を補正
+      const dx = serverPuck.x - puck.x;
+      const dy = serverPuck.y - puck.y;
+      puck.x += dx * INTERPOLATION_FACTOR;
+      puck.y += dy * INTERPOLATION_FACTOR;
     }
 
     // ========================================
@@ -810,6 +808,9 @@
             serverPuck.y = data.y;
             serverPuck.vx = data.vx;
             serverPuck.vy = data.vy;
+            // 速度は即座に反映（シミュレーションの方向を合わせる）
+            puck.vx = data.vx;
+            puck.vy = data.vy;
           }
           break;
         case 'goal':
