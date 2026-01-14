@@ -303,7 +303,7 @@
       vx: 0,
       vy: 0
     };
-    const INTERPOLATION_FACTOR = 0.3; // 補間係数（0-1、大きいほど速く補正）
+    const INTERPOLATION_FACTOR = 0.15; // 補間係数（小さくして滑らかに）
 
     // ========================================
     // DOM要素
@@ -512,43 +512,33 @@
     // ゲスト用：パック移動予測（滑らかな表示用）
     // ========================================
     function updatePuckPrediction() {
-      // 速度に基づいて位置を予測
-      puck.x += puck.vx;
-      puck.y += puck.vy;
+      // サーバー位置も速度で更新（予測）
+      serverPuck.x += serverPuck.vx;
+      serverPuck.y += serverPuck.vy;
 
-      // 左右の壁との衝突（予測）
-      if (puck.x - PUCK_RADIUS <= 0) {
-        puck.x = PUCK_RADIUS;
-        puck.vx = -puck.vx;
-      } else if (puck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
-        puck.x = CANVAS_WIDTH - PUCK_RADIUS;
-        puck.vx = -puck.vx;
+      // サーバー位置の壁反射（予測）
+      if (serverPuck.x - PUCK_RADIUS <= 0) {
+        serverPuck.x = PUCK_RADIUS;
+        serverPuck.vx = -serverPuck.vx;
+      } else if (serverPuck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
+        serverPuck.x = CANVAS_WIDTH - PUCK_RADIUS;
+        serverPuck.vx = -serverPuck.vx;
+      }
+      if (serverPuck.y - PUCK_RADIUS <= 0) {
+        serverPuck.y = PUCK_RADIUS;
+        serverPuck.vy = -serverPuck.vy;
+      } else if (serverPuck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
+        serverPuck.y = CANVAS_HEIGHT - PUCK_RADIUS;
+        serverPuck.vy = -serverPuck.vy;
       }
 
-      // 上下の壁との衝突（予測、ゴールは考慮しない）
-      if (puck.y - PUCK_RADIUS <= 0) {
-        puck.y = PUCK_RADIUS;
-        puck.vy = -puck.vy;
-      } else if (puck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
-        puck.y = CANVAS_HEIGHT - PUCK_RADIUS;
-        puck.vy = -puck.vy;
-      }
+      // 現在位置をサーバー位置に向かって滑らかに補間
+      puck.x += (serverPuck.x - puck.x) * INTERPOLATION_FACTOR;
+      puck.y += (serverPuck.y - puck.y) * INTERPOLATION_FACTOR;
 
-      // サーバーからの正しい位置に向かって補間
-      // 位置の差が大きい場合は滑らかに補正
-      const dx = serverPuck.x - puck.x;
-      const dy = serverPuck.y - puck.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > 1) {
-        // 位置を補間
-        puck.x += dx * INTERPOLATION_FACTOR;
-        puck.y += dy * INTERPOLATION_FACTOR;
-      }
-
-      // 速度もサーバーの値に合わせる
-      puck.vx = serverPuck.vx;
-      puck.vy = serverPuck.vy;
+      // 速度も補間（急な変化を避ける）
+      puck.vx += (serverPuck.vx - puck.vx) * INTERPOLATION_FACTOR;
+      puck.vy += (serverPuck.vy - puck.vy) * INTERPOLATION_FACTOR;
     }
 
     // ========================================
