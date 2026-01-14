@@ -397,7 +397,6 @@
     // ゲーム初期化
     // ========================================
     function initGame(isOfferer) {
-      console.log('initGame called, isOfferer:', isOfferer);
       isHost = isOfferer;
       gameOver = false;
       hostScore = 0;
@@ -413,7 +412,6 @@
         myPaddleY = CANVAS_HEIGHT / 4;
         opponentPaddleY = CANVAS_HEIGHT * 3 / 4;
       }
-      console.log('Paddle positions - my:', myPaddleX, myPaddleY, 'opponent:', opponentPaddleX, opponentPaddleY);
 
       // パック初期化
       resetPuck();
@@ -476,19 +474,13 @@
     function gameLoop() {
       if (gameOver) return;
 
-      try {
-        // ホストのみ物理演算
-        if (isHost) {
-          updatePuck();
-        }
-
-        // 描画
-        draw();
-      } catch (e) {
-        console.error('ゲームループエラー:', e);
-        alert('エラー: ' + e.message);
-        return;
+      // ホストのみ物理演算
+      if (isHost) {
+        updatePuck();
       }
+
+      // 描画
+      draw();
 
       animationId = requestAnimationFrame(gameLoop);
     }
@@ -655,12 +647,6 @@
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // デバッグ: 描画時の座標を表示
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '10px Arial';
-      ctx.fillText(`my: ${Math.round(myPaddleX)},${Math.round(myPaddleY)}`, 5, 15);
-      ctx.fillText(`opp: ${Math.round(opponentPaddleX)},${Math.round(opponentPaddleY)}`, 5, 30);
-
       // パック
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
@@ -792,8 +778,6 @@
         newX = Math.max(PADDLE_RADIUS, Math.min(CANVAS_WIDTH - PADDLE_RADIUS, newX));
         // Y方向の制限
         newY = Math.max(minY, Math.min(maxY, newY));
-
-        console.log('updatePaddlePosition - isHost:', isHost, 'newX:', newX, 'newY:', newY, 'minY:', minY, 'maxY:', maxY);
 
         myPaddleX = newX;
         myPaddleY = newY;
