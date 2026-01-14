@@ -298,7 +298,6 @@
 
     // 補間設定
     const LERP_FACTOR = 0.3;
-    const TELEPORT_THRESHOLD = 50 * 50; // この距離以上ずれたら即座に補正
 
     // ========================================
     // DOM要素
@@ -760,23 +759,11 @@
           break;
         case 'puck':
           if (!isHost) {
-            // サーバーとの位置差を計算
+            // サーバーとの位置差を計算して補間
             const dx = data.x - puck.x;
             const dy = data.y - puck.y;
-            const distSq = dx * dx + dy * dy;
-
-            console.log(`puck受信: distSq=${distSq.toFixed(0)}, threshold=${TELEPORT_THRESHOLD}, teleport=${distSq > TELEPORT_THRESHOLD}`);
-
-            if (distSq > TELEPORT_THRESHOLD) {
-              // テレポート：即座に補正
-              console.log(`テレポート: (${puck.x.toFixed(0)},${puck.y.toFixed(0)}) → (${data.x.toFixed(0)},${data.y.toFixed(0)})`);
-              puck.x = data.x;
-              puck.y = data.y;
-            } else {
-              // 補間：現在位置とサーバー位置の間を滑らかに補正
-              puck.x += dx * LERP_FACTOR;
-              puck.y += dy * LERP_FACTOR;
-            }
+            puck.x += dx * LERP_FACTOR;
+            puck.y += dy * LERP_FACTOR;
 
             // 速度は常にサーバーの値を使用
             puck.vx = data.vx;
