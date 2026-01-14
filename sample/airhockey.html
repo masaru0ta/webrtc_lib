@@ -700,36 +700,52 @@
     // ========================================
     function sendPaddlePosition() {
       if (!client || !client.isConnected) return;
-      // ゲストはY座標を反転してホスト座標系で送信
-      const sendY = isHost ? myPaddleY : flipY(myPaddleY);
-      client.send({ type: 'paddle', x: myPaddleX, y: sendY });
+      try {
+        // ゲストはY座標を反転してホスト座標系で送信
+        const sendY = isHost ? myPaddleY : flipY(myPaddleY);
+        client.send({ type: 'paddle', x: myPaddleX, y: sendY });
+      } catch (e) {
+        // 接続が完全に開いていない場合は無視
+      }
     }
 
     function sendPuckState() {
       if (!client || !client.isConnected || !isHost) return;
-      client.send({
-        type: 'puck',
-        x: puck.x,
-        y: puck.y,
-        vx: puck.vx,
-        vy: puck.vy
-      });
+      try {
+        client.send({
+          type: 'puck',
+          x: puck.x,
+          y: puck.y,
+          vx: puck.vx,
+          vy: puck.vy
+        });
+      } catch (e) {
+        // 接続が完全に開いていない場合は無視
+      }
     }
 
     function sendGoal(scorer) {
       if (!client || !client.isConnected) return;
-      client.send({
-        type: 'goal',
-        scorer: scorer,
-        hostScore: hostScore,
-        guestScore: guestScore
-      });
-      updateScoreDisplay();
+      try {
+        client.send({
+          type: 'goal',
+          scorer: scorer,
+          hostScore: hostScore,
+          guestScore: guestScore
+        });
+        updateScoreDisplay();
+      } catch (e) {
+        // 接続が完全に開いていない場合は無視
+      }
     }
 
     function sendReset() {
       if (!client || !client.isConnected) return;
-      client.send({ type: 'reset' });
+      try {
+        client.send({ type: 'reset' });
+      } catch (e) {
+        // 接続が完全に開いていない場合は無視
+      }
     }
 
     function receiveMessage(data) {
