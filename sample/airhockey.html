@@ -788,6 +788,9 @@
             endGame('host');
           } else if (guestScore >= WINNING_SCORE) {
             endGame('guest');
+          } else {
+            // ゲスト側でもパックをリセット
+            resetPuck();
           }
           break;
         case 'reset':
