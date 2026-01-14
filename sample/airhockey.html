@@ -296,11 +296,9 @@
       vy: 0
     };
 
-    // ゲスト用：表示位置（滑らかな補間用）
-    let displayPuck = {
-      x: CANVAS_WIDTH / 2,
-      y: CANVAS_HEIGHT / 2
-    };
+    // 補間設定
+    const LERP_FACTOR = 0.3;
+    const TELEPORT_THRESHOLD = 50 * 50; // この距離以上ずれたら即座に補正
 
     // ========================================
     // DOM要素
@@ -455,8 +453,6 @@
       puck.y = CANVAS_HEIGHT / 2;
       puck.vx = 0;
       puck.vy = 0;
-      displayPuck.x = CANVAS_WIDTH / 2;
-      displayPuck.y = CANVAS_HEIGHT / 2;
     }
 
     function updateScoreDisplay() {
@@ -489,16 +485,8 @@
     function gameLoop() {
       if (gameOver) return;
 
-      // ホストのみ物理演算を実行
-      if (isHost) {
-        updatePuck();
-      }
-
-      // ゲストは表示位置を滑らかに補間
-      if (!isHost) {
-        displayPuck.x += (puck.x - displayPuck.x) * 0.3;
-        displayPuck.y += (puck.y - displayPuck.y) * 0.3;
-      }
+      // 両方で物理演算を実行（ローカルシミュレーション）
+      updatePuck();
 
       // 描画
       draw();
@@ -507,7 +495,7 @@
     }
 
     // ========================================
-    // 物理演算（ホストのみ）
+    // 物理演算（両プレイヤーで実行）
     // ========================================
     function updatePuck() {
       // パック移動
@@ -527,17 +515,18 @@
       const goalLeft = (CANVAS_WIDTH - GOAL_WIDTH) / 2;
       const goalRight = (CANVAS_WIDTH + GOAL_WIDTH) / 2;
 
-      // 上ゴール（ゲストのゴール）
+      // 上ゴール（ゲストのゴール）- ホストのみ判定
       if (puck.y - PUCK_RADIUS <= 0) {
         if (puck.x >= goalLeft && puck.x <= goalRight) {
-          // ホストが得点
-          hostScore++;
-          sendGoal('host');
-          if (hostScore >= WINNING_SCORE) {
-            endGame('host');
-          } else {
-            resetPuck();
-            sendPuckState();
+          if (isHost) {
+            hostScore++;
+            sendGoal('host');
+            if (hostScore >= WINNING_SCORE) {
+              endGame('host');
+            } else {
+              resetPuck();
+              sendPuckState();
+            }
           }
           return;
         } else {
@@ -546,17 +535,18 @@
         }
       }
 
-      // 下ゴール（ホストのゴール）
+      // 下ゴール（ホストのゴール）- ホストのみ判定
       if (puck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
         if (puck.x >= goalLeft && puck.x <= goalRight) {
-          // ゲストが得点
-          guestScore++;
-          sendGoal('guest');
-          if (guestScore >= WINNING_SCORE) {
-            endGame('guest');
-          } else {
-            resetPuck();
-            sendPuckState();
+          if (isHost) {
+            guestScore++;
+            sendGoal('guest');
+            if (guestScore >= WINNING_SCORE) {
+              endGame('guest');
+            } else {
+              resetPuck();
+              sendPuckState();
+            }
           }
           return;
         } else {
@@ -576,8 +566,10 @@
       const guestPaddleY = isHost ? opponentPaddleY : myPaddleY;
       checkPaddleCollision(guestPaddleX, guestPaddleY);
 
-      // パック状態を毎フレーム送信
-      sendPuckState();
+      // ホストのみパック状態を送信
+      if (isHost) {
+        sendPuckState();
+      }
     }
 
     // パドルとパックの衝突判定（円同士）
@@ -672,9 +664,9 @@
       const oppDrawX = opponentPaddleX;
       const oppDrawY = isHost ? opponentPaddleY : flipY(opponentPaddleY);
 
-      // パックの描画位置（ゲストは補間位置を使用、Y座標は反転）
-      const puckDrawX = isHost ? puck.x : displayPuck.x;
-      const puckDrawY = isHost ? puck.y : flipY(displayPuck.y);
+      // パックの描画位置（ゲストはY座標を反転）
+      const puckDrawX = puck.x;
+      const puckDrawY = isHost ? puck.y : flipY(puck.y);
 
       // パドル（上側・相手）
       ctx.fillStyle = isHost ? '#0f3460' : '#e94560';  // ホスト視点:青、ゲスト視点:赤
@@ -768,9 +760,22 @@
           break;
         case 'puck':
           if (!isHost) {
-            // ホストから受信した位置をそのまま反映
-            puck.x = data.x;
-            puck.y = data.y;
+            // サーバーとの位置差を計算
+            const dx = data.x - puck.x;
+            const dy = data.y - puck.y;
+            const distSq = dx * dx + dy * dy;
+
+            if (distSq > TELEPORT_THRESHOLD) {
+              // テレポート：即座に補正
+              puck.x = data.x;
+              puck.y = data.y;
+            } else {
+              // 補間：現在位置とサーバー位置の間を滑らかに補正
+              puck.x += dx * LERP_FACTOR;
+              puck.y += dy * LERP_FACTOR;
+            }
+
+            // 速度は常にサーバーの値を使用
             puck.vx = data.vx;
             puck.vy = data.vy;
           }
