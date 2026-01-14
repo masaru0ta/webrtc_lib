@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>〇✕ゲーム - WebRTC-GAS サンプル</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .player-info {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .player-name {
+      font-size: 20px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .player-id {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .status {
+      color: #666;
+      margin: 15px 0;
+      font-size: 14px;
+    }
+
+    .status.error {
+      color: #e74c3c;
+    }
+
+    /* ゲームボード */
+    .game-info {
+      margin-bottom: 20px;
+    }
+
+    .opponent-name {
+      font-size: 16px;
+      color: #666;
+    }
+
+    .turn-info {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .turn-info.my-turn {
+      color: #27ae60;
+    }
+
+    .turn-info.opponent-turn {
+      color: #e74c3c;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 20px auto;
+      max-width: 300px;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      background: #f5f5f5;
+      border: none;
+      border-radius: 10px;
+      font-size: 48px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .cell:hover:not(:disabled) {
+      background: #e8e8ff;
+      transform: scale(1.05);
+    }
+
+    .cell:disabled {
+      cursor: not-allowed;
+    }
+
+    .cell.o {
+      color: #667eea;
+    }
+
+    .cell.x {
+      color: #e74c3c;
+    }
+
+    .result {
+      font-size: 24px;
+      font-weight: bold;
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 10px;
+    }
+
+    .result.win {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .result.lose {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .result.draw {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .game-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .game-buttons .btn {
+      flex: 1;
+    }
+
+    /* ローディング */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>〇✕ゲーム</h1>
+
+    <!-- 接続前画面 -->
+    <div id="screen-lobby" class="screen active">
+      <div class="player-info">
+        <div class="player-name" id="my-name">-</div>
+        <div class="player-id" id="my-id">ID: -</div>
+      </div>
+
+      <button class="btn" id="btn-start">マッチング開始</button>
+
+      <div class="status" id="status">準備完了</div>
+
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="screen-game" class="screen">
+      <div class="game-info">
+        <div class="opponent-name">VS <span id="opponent-name">-</span></div>
+        <div class="turn-info" id="turn-info">-</div>
+      </div>
+
+      <div class="board" id="board">
+        <button class="cell" data-index="0"></button>
+        <button class="cell" data-index="1"></button>
+        <button class="cell" data-index="2"></button>
+        <button class="cell" data-index="3"></button>
+        <button class="cell" data-index="4"></button>
+        <button class="cell" data-index="5"></button>
+        <button class="cell" data-index="6"></button>
+        <button class="cell" data-index="7"></button>
+        <button class="cell" data-index="8"></button>
+      </div>
+
+      <div class="result" id="result" style="display: none;"></div>
+
+      <div class="game-buttons">
+        <button class="btn" id="btn-rematch" style="display: none;">もう一度</button>
+        <button class="btn btn-secondary" id="btn-disconnect">切断</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../src/webrtc-gas.js"></script>
+  <script>
+    // ========================================
+    // 定数
+    // ========================================
+    const API_URL = 'https://script.google.com/macros/s/AKfycbz9RbzxrYV8QbsclJcwNYhO4JoE9qQZlD-aWX5Z5U9jICPBEiBbEznf3scgQx8GONZa1A/exec';
+
+    const ZODIAC_NAMES = [
+      'ねずみ', 'うし', 'とら', 'うさぎ', 'たつ', 'へび',
+      'うま', 'ひつじ', 'さる', 'とり', 'いぬ', 'いのしし'
+    ];
+
+    const STORAGE_KEYS = {
+      MY_ID: 'tictactoe_myId',
+      MY_NAME: 'tictactoe_myName',
+      FRIEND_LIST: 'tictactoe_friendList'
+    };
+
+    // ========================================
+    // ゲーム状態
+    // ========================================
+    let client = null;
+    let board = Array(9).fill(null);
+    let isMyTurn = false;
+    let mySymbol = null; // 'O' or 'X'
+    let gameOver = false;
+
+    // ========================================
+    // DOM要素
+    // ========================================
+    const elements = {
+      screenLobby: document.getElementById('screen-lobby'),
+      screenGame: document.getElementById('screen-game'),
+      myName: document.getElementById('my-name'),
+      myId: document.getElementById('my-id'),
+      btnStart: document.getElementById('btn-start'),
+      status: document.getElementById('status'),
+      opponentName: document.getElementById('opponent-name'),
+      turnInfo: document.getElementById('turn-info'),
+      board: document.getElementById('board'),
+      result: document.getElementById('result'),
+      btnRematch: document.getElementById('btn-rematch'),
+      btnDisconnect: document.getElementById('btn-disconnect'),
+      cells: document.querySelectorAll('.cell')
+    };
+
+    // ========================================
+    // localStorage 操作
+    // ========================================
+    function loadFromStorage() {
+      return {
+        myId: localStorage.getItem(STORAGE_KEYS.MY_ID) || null,
+        myName: localStorage.getItem(STORAGE_KEYS.MY_NAME) || null,
+        friendList: JSON.parse(localStorage.getItem(STORAGE_KEYS.FRIEND_LIST) || '[]')
+      };
+    }
+
+    function saveToStorage(key, value) {
+      if (key === STORAGE_KEYS.FRIEND_LIST) {
+        localStorage.setItem(key, JSON.stringify(value));
+      } else {
+        localStorage.setItem(key, value);
+      }
+    }
+
+    function addFriend(friendId) {
+      const data = loadFromStorage();
+      if (!data.friendList.includes(friendId)) {
+        data.friendList.push(friendId);
+        saveToStorage(STORAGE_KEYS.FRIEND_LIST, data.friendList);
+      }
+    }
+
+    // ========================================
+    // 名前生成
+    // ========================================
+    function generateName() {
+      const index = Math.floor(Math.random() * ZODIAC_NAMES.length);
+      return ZODIAC_NAMES[index];
+    }
+
+    // ========================================
+    // グローバルIP取得
+    // ========================================
+    async function getGlobalIp() {
+      try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip;
+      } catch (error) {
+        console.warn('グローバルIP取得失敗:', error);
+        return '';
+      }
+    }
+
+    // ========================================
+    // 画面切り替え
+    // ========================================
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    function setStatus(message, isError = false) {
+      elements.status.textContent = message;
+      elements.status.classList.toggle('error', isError);
+    }
+
+    // ========================================
+    // 接続処理
+    // ========================================
+    async function connectToPeer(peerId) {
+      try {
+        setStatus('接続中...');
+        elements.btnStart.disabled = true;
+
+        await client.connect(peerId);
+
+      } catch (error) {
+        setStatus('接続エラー: ' + error.message, true);
+        elements.btnStart.disabled = false;
+      }
+    }
+
+    // ========================================
+    // ゲーム処理
+    // ========================================
+    function startGame(isOfferer) {
+      // オファー側が〇（先手）
+      mySymbol = isOfferer ? 'O' : 'X';
+      isMyTurn = isOfferer;
+      board = Array(9).fill(null);
+      gameOver = false;
+
+      // フレンドリストに追加
+      addFriend(client.peerId);
+
+      // UI更新
+      elements.opponentName.textContent = client.peerName || client.peerId;
+      updateTurnInfo();
+      updateBoard();
+      elements.result.style.display = 'none';
+      elements.btnRematch.style.display = 'none';
+
+      showScreen('screen-game');
+    }
+
+    function updateTurnInfo() {
+      if (gameOver) return;
+
+      if (isMyTurn) {
+        elements.turnInfo.textContent = `あなたの番（${mySymbol}）`;
+        elements.turnInfo.className = 'turn-info my-turn';
+      } else {
+        const opponentSymbol = mySymbol === 'O' ? 'X' : 'O';
+        elements.turnInfo.textContent = `相手の番（${opponentSymbol}）`;
+        elements.turnInfo.className = 'turn-info opponent-turn';
+      }
+    }
+
+    function updateBoard() {
+      elements.cells.forEach((cell, index) => {
+        cell.textContent = board[index] || '';
+        cell.className = 'cell';
+        if (board[index]) {
+          cell.classList.add(board[index].toLowerCase());
+        }
+        cell.disabled = !isMyTurn || board[index] !== null || gameOver;
+      });
+    }
+
+    function makeMove(index) {
+      if (!isMyTurn || board[index] !== null || gameOver) return;
+
+      // 手を打つ
+      board[index] = mySymbol;
+      isMyTurn = false;
+
+      // 相手に送信
+      client.send({ type: 'move', index: index });
+
+      updateBoard();
+      updateTurnInfo();
+      checkGameEnd();
+    }
+
+    function receiveMove(index) {
+      const opponentSymbol = mySymbol === 'O' ? 'X' : 'O';
+      board[index] = opponentSymbol;
+      isMyTurn = true;
+
+      updateBoard();
+      updateTurnInfo();
+      checkGameEnd();
+    }
+
+    function checkGameEnd() {
+      const winner = checkWinner();
+
+      if (winner) {
+        gameOver = true;
+        const isWin = winner === mySymbol;
+        showResult(isWin ? 'win' : 'lose', isWin ? '勝ち！' : '負け...');
+      } else if (board.every(cell => cell !== null)) {
+        gameOver = true;
+        showResult('draw', '引き分け');
+      }
+    }
+
+    function checkWinner() {
+      const lines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // 縦
+        [0, 4, 8], [2, 4, 6]             // 斜め
+      ];
+
+      for (const [a, b, c] of lines) {
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return board[a];
+        }
+      }
+      return null;
+    }
+
+    function showResult(type, message) {
+      elements.result.textContent = message;
+      elements.result.className = 'result ' + type;
+      elements.result.style.display = 'block';
+      elements.btnRematch.style.display = 'block';
+      elements.turnInfo.textContent = '';
+    }
+
+    function resetGame() {
+      board = Array(9).fill(null);
+      gameOver = false;
+      // 先手後手を入れ替え
+      mySymbol = mySymbol === 'O' ? 'X' : 'O';
+      isMyTurn = mySymbol === 'O';
+
+      updateBoard();
+      updateTurnInfo();
+      elements.result.style.display = 'none';
+      elements.btnRematch.style.display = 'none';
+
+      // 相手に通知
+      client.send({ type: 'reset' });
+    }
+
+    function receiveReset() {
+      board = Array(9).fill(null);
+      gameOver = false;
+      // 先手後手を入れ替え
+      mySymbol = mySymbol === 'O' ? 'X' : 'O';
+      isMyTurn = mySymbol === 'O';
+
+      updateBoard();
+      updateTurnInfo();
+      elements.result.style.display = 'none';
+      elements.btnRematch.style.display = 'none';
+    }
+
+    // ========================================
+    // 初期化
+    // ========================================
+    async function init() {
+      // localStorage から読み込み
+      const stored = loadFromStorage();
+
+      // 名前がなければ生成
+      const myName = stored.myName || generateName();
+      if (!stored.myName) {
+        saveToStorage(STORAGE_KEYS.MY_NAME, myName);
+      }
+
+      // UI更新
+      elements.myName.textContent = myName;
+      elements.myId.textContent = stored.myId ? `ID: ${stored.myId}` : 'ID: 未登録';
+
+      // マッチング開始ボタン
+      elements.btnStart.addEventListener('click', async () => {
+        try {
+          elements.btnStart.disabled = true;
+          setStatus('IP取得中...');
+
+          // グローバルIP取得
+          const globalIp = await getGlobalIp();
+
+          setStatus('登録中...');
+
+          // クライアント作成
+          client = new WebRTCGAS.Client({
+            apiUrl: API_URL,
+            name: myName,
+            id: stored.myId,
+            globalIp: globalIp,
+            friendList: stored.friendList,
+            pollingInterval: 2000
+          });
+
+          // イベント設定
+          client.on('registered', (data) => {
+            // IDを保存
+            saveToStorage(STORAGE_KEYS.MY_ID, data.id);
+            elements.myId.textContent = `ID: ${data.id}`;
+            setStatus('マッチング中...');
+          });
+
+          client.on('matchFound', (data) => {
+            // 登録時のみ matchFound が発火する
+            // 後から登録したユーザーがマッチを発見して接続を開始
+            if (data.matchList.length > 0 && !client.peerId) {
+              connectToPeer(data.matchList[0].id);
+            }
+          });
+
+          client.on('offer', (data) => {
+            // オファーを受信したら自動で接続
+            setStatus('接続中...');
+          });
+
+          client.on('connected', (data) => {
+            // 接続完了をAPIに報告
+            fetch(API_URL, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'sendsignal',
+                id: client.id,
+                peer_id: client.peerId,
+                status: 'connected',
+                type: 'polling'
+              }),
+              redirect: 'follow'
+            }).catch(() => {});
+
+            // _isOfferer は内部プロパティなので代わりに mySymbol で判断
+            const isOfferer = client._isOfferer;
+            startGame(isOfferer);
+          });
+
+          client.on('message', (data) => {
+            if (data.data.type === 'move') {
+              receiveMove(data.data.index);
+            } else if (data.data.type === 'reset') {
+              receiveReset();
+            }
+          });
+
+          client.on('disconnected', (data) => {
+            alert('接続が切断されました');
+            location.reload();
+          });
+
+          client.on('error', (data) => {
+            setStatus('エラー: ' + data.error.message, true);
+            elements.btnStart.disabled = false;
+          });
+
+          client.on('reset', (data) => {
+            console.log('リセット:', data.message);
+            // 再登録が必要（nextStatus === 'register'）
+            alert('接続エラーが発生しました。再接続します。');
+            location.reload();
+          });
+
+          // 登録
+          await client.register();
+
+        } catch (error) {
+          setStatus('エラー: ' + error.message, true);
+          elements.btnStart.disabled = false;
+        }
+      });
+
+      // セルクリック
+      elements.cells.forEach((cell, index) => {
+        cell.addEventListener('click', () => makeMove(index));
+      });
+
+      // もう一度ボタン
+      elements.btnRematch.addEventListener('click', resetGame);
+
+      // 切断ボタン
+      elements.btnDisconnect.addEventListener('click', () => {
+        if (client) {
+          client.disconnect();
+        }
+        location.reload();
+      });
+    }
+
+    // 起動
+    init();
+  </script>
+</body>
+</html>
