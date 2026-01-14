@@ -1,6 +1,6 @@
-# ＜ここにプロジェクト名を書く＞
+# webrtc_lib
 
-＜ここにプロジェクト概要を書く＞
+
 
 ## YOU MUST: 
 - 回答は日本語で行うこと
@@ -33,13 +33,13 @@
 
 ### GitHub
 
-- **リポジトリURL**: ＜ここに Github の URL を書く＞
+- **リポジトリURL**: https://github.com/masaru0ta/webrtc_lib
 
 
 ### GAS (Google App Script)
 
-- **プロジェクト名**: ＜ここにプロジェクト名を書く＞
-- **スクリプトURL**: ＜ここにGASプロジェクトのURLを書く＞
+- **プロジェクト名**: webrtc_lib
+- **スクリプトURL**: https://script.google.com/d/15RvOJhJpbofgIl5e0cBAxqhqeMjx4c-L6pOhmGo9LtcBPAv4SRzN4j6j/edit
 - **デプロイURL**:
 
 GASコードは `src/gas/script.js` で管理。
