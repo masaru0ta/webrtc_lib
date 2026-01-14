@@ -397,6 +397,7 @@
     // ゲーム初期化
     // ========================================
     function initGame(isOfferer) {
+      console.log('initGame called, isOfferer:', isOfferer);
       isHost = isOfferer;
       gameOver = false;
       hostScore = 0;
@@ -412,6 +413,7 @@
         myPaddleY = CANVAS_HEIGHT / 4;
         opponentPaddleY = CANVAS_HEIGHT * 3 / 4;
       }
+      console.log('Paddle positions - my:', myPaddleX, myPaddleY, 'opponent:', opponentPaddleX, opponentPaddleY);
 
       // パック初期化
       resetPuck();
@@ -474,13 +476,19 @@
     function gameLoop() {
       if (gameOver) return;
 
-      // ホストのみ物理演算
-      if (isHost) {
-        updatePuck();
-      }
+      try {
+        // ホストのみ物理演算
+        if (isHost) {
+          updatePuck();
+        }
 
-      // 描画
-      draw();
+        // 描画
+        draw();
+      } catch (e) {
+        console.error('ゲームループエラー:', e);
+        alert('エラー: ' + e.message);
+        return;
+      }
 
       animationId = requestAnimationFrame(gameLoop);
     }
