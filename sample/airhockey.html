@@ -471,29 +471,13 @@
       // 描画
       draw();
 
-      // デバッグ: 衝突判定用の情報を表示
-      ctx.fillStyle = '#ffff00';
-      ctx.font = '10px Arial';
-      ctx.fillText(`isHost: ${isHost}`, 5, 15);
-      ctx.fillText(`myPaddle: ${Math.round(myPaddleX)},${Math.round(myPaddleY)}`, 5, 27);
-      ctx.fillText(`oppPaddle: ${Math.round(opponentPaddleX)},${Math.round(opponentPaddleY)}`, 5, 39);
-      ctx.fillText(`puck: ${Math.round(puck.x)},${Math.round(puck.y)} v:${puck.vx.toFixed(2)},${puck.vy.toFixed(2)}`, 5, 51);
-      // パドルとパックの距離
-      const dist1 = Math.sqrt((puck.x - myPaddleX) ** 2 + (puck.y - myPaddleY) ** 2);
-      ctx.fillText(`dist to my: ${dist1.toFixed(1)} (need<45)`, 5, 63);
-
       animationId = requestAnimationFrame(gameLoop);
     }
 
     // ========================================
     // 物理演算（ホストのみ）
     // ========================================
-    let updateCount = 0;
     function updatePuck() {
-      updateCount++;
-      if (updateCount % 60 === 0) {
-        console.log('updatePuck called, puck:', puck.x, puck.y, 'v:', puck.vx, puck.vy);
-      }
       // パック移動
       puck.x += puck.vx;
       puck.y += puck.vy;
@@ -574,9 +558,7 @@
       const minDist = PUCK_RADIUS + PADDLE_RADIUS;
 
       if (distance < minDist && distance > 0) {
-        // 衝突！
-        console.log('衝突検出! distance:', distance, 'minDist:', minDist);
-        // パックを押し出す
+        // 衝突！パックを押し出す
         const overlap = minDist - distance;
         const nx = dx / distance; // 法線ベクトル
         const ny = dy / distance;
@@ -959,7 +941,6 @@
           });
 
           client.on('reset', (data) => {
-            console.log('リセット:', data.message);
             alert('接続エラーが発生しました。再接続します。');
             location.reload();
           });
