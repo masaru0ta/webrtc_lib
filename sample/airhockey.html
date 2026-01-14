@@ -655,6 +655,12 @@
       ctx.lineWidth = 3;
       ctx.stroke();
 
+      // デバッグ: 描画時の座標を表示
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px Arial';
+      ctx.fillText(`my: ${Math.round(myPaddleX)},${Math.round(myPaddleY)}`, 5, 15);
+      ctx.fillText(`opp: ${Math.round(opponentPaddleX)},${Math.round(opponentPaddleY)}`, 5, 30);
+
       // パック
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
@@ -786,6 +792,8 @@
         newX = Math.max(PADDLE_RADIUS, Math.min(CANVAS_WIDTH - PADDLE_RADIUS, newX));
         // Y方向の制限
         newY = Math.max(minY, Math.min(maxY, newY));
+
+        console.log('updatePaddlePosition - isHost:', isHost, 'newX:', newX, 'newY:', newY, 'minY:', minY, 'maxY:', maxY);
 
         myPaddleX = newX;
         myPaddleY = newY;
