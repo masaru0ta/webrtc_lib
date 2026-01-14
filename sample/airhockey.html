@@ -262,14 +262,11 @@
     // ゲーム定数
     const CANVAS_WIDTH = 400;
     const CANVAS_HEIGHT = 500;
-    const PADDLE_WIDTH = 80;
-    const PADDLE_HEIGHT = 15;
-    const PADDLE_MARGIN = 30;
+    const PADDLE_RADIUS = 30; // 丸いパドル
     const PUCK_RADIUS = 15;
     const GOAL_WIDTH = 120;
     const WINNING_SCORE = 5;
     const PUCK_SPEED = 5;
-    const PADDLE_AREA_HEIGHT = 200; // パドルが動ける範囲の高さ
 
     // ========================================
     // ゲーム状態
@@ -285,8 +282,10 @@
     let hostScore = 0;
     let guestScore = 0;
 
-    // パドル位置（中央X, Y位置）
+    // パドル位置（X, Y位置）
+    let myPaddleX = CANVAS_WIDTH / 2;
     let myPaddleY = 0;
+    let opponentPaddleX = CANVAS_WIDTH / 2;
     let opponentPaddleY = 0;
 
     // パック状態（ホストが管理）
@@ -403,13 +402,15 @@
       hostScore = 0;
       guestScore = 0;
 
-      // パドル初期位置
+      // パドル初期位置（ホストは下半分、ゲストは上半分）
+      myPaddleX = CANVAS_WIDTH / 2;
+      opponentPaddleX = CANVAS_WIDTH / 2;
       if (isHost) {
-        myPaddleY = CANVAS_HEIGHT - PADDLE_MARGIN;
-        opponentPaddleY = PADDLE_MARGIN;
+        myPaddleY = CANVAS_HEIGHT * 3 / 4;
+        opponentPaddleY = CANVAS_HEIGHT / 4;
       } else {
-        myPaddleY = PADDLE_MARGIN;
-        opponentPaddleY = CANVAS_HEIGHT - PADDLE_MARGIN;
+        myPaddleY = CANVAS_HEIGHT / 4;
+        opponentPaddleY = CANVAS_HEIGHT * 3 / 4;
       }
 
       // パック初期化
@@ -543,43 +544,45 @@
         }
       }
 
-      // パドルとの衝突（ホストのパドル - 下側）
-      const hostPaddleY = CANVAS_HEIGHT - PADDLE_MARGIN;
-      if (puck.vy > 0 &&
-          puck.y + PUCK_RADIUS >= hostPaddleY - PADDLE_HEIGHT / 2 &&
-          puck.y + PUCK_RADIUS <= hostPaddleY + PADDLE_HEIGHT / 2 + 5) {
-        const paddleX = CANVAS_WIDTH / 2;
-        if (puck.x >= paddleX - PADDLE_WIDTH / 2 - PUCK_RADIUS &&
-            puck.x <= paddleX + PADDLE_WIDTH / 2 + PUCK_RADIUS) {
-          puck.y = hostPaddleY - PADDLE_HEIGHT / 2 - PUCK_RADIUS;
-          puck.vy = -puck.vy;
-          // 当たった位置で角度を変える
-          const hitPos = (puck.x - paddleX) / (PADDLE_WIDTH / 2);
-          puck.vx += hitPos * 2;
-          // 速度を正規化
-          const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-          puck.vx = (puck.vx / speed) * PUCK_SPEED;
-          puck.vy = (puck.vy / speed) * PUCK_SPEED;
-        }
-      }
+      // パドルとの衝突（円同士）
+      // ホストのパドル（下半分）
+      const hostPaddleX = isHost ? myPaddleX : opponentPaddleX;
+      const hostPaddleY = isHost ? myPaddleY : opponentPaddleY;
+      checkPaddleCollision(hostPaddleX, hostPaddleY);
 
-      // パドルとの衝突（ゲストのパドル - 上側）
-      const guestPaddleY = PADDLE_MARGIN;
-      if (puck.vy < 0 &&
-          puck.y - PUCK_RADIUS <= guestPaddleY + PADDLE_HEIGHT / 2 &&
-          puck.y - PUCK_RADIUS >= guestPaddleY - PADDLE_HEIGHT / 2 - 5) {
-        const paddleX = CANVAS_WIDTH / 2;
-        if (puck.x >= paddleX - PADDLE_WIDTH / 2 - PUCK_RADIUS &&
-            puck.x <= paddleX + PADDLE_WIDTH / 2 + PUCK_RADIUS) {
-          puck.y = guestPaddleY + PADDLE_HEIGHT / 2 + PUCK_RADIUS;
-          puck.vy = -puck.vy;
-          // 当たった位置で角度を変える
-          const hitPos = (puck.x - paddleX) / (PADDLE_WIDTH / 2);
-          puck.vx += hitPos * 2;
-          // 速度を正規化
-          const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-          puck.vx = (puck.vx / speed) * PUCK_SPEED;
-          puck.vy = (puck.vy / speed) * PUCK_SPEED;
+      // ゲストのパドル（上半分）
+      const guestPaddleX = isHost ? opponentPaddleX : myPaddleX;
+      const guestPaddleY = isHost ? opponentPaddleY : myPaddleY;
+      checkPaddleCollision(guestPaddleX, guestPaddleY);
+    }
+
+    // パドルとパックの衝突判定（円同士）
+    function checkPaddleCollision(paddleX, paddleY) {
+      const dx = puck.x - paddleX;
+      const dy = puck.y - paddleY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const minDist = PUCK_RADIUS + PADDLE_RADIUS;
+
+      if (distance < minDist && distance > 0) {
+        // 衝突！ パックを押し出す
+        const overlap = minDist - distance;
+        const nx = dx / distance; // 法線ベクトル
+        const ny = dy / distance;
+
+        // パックを押し出す
+        puck.x += nx * overlap;
+        puck.y += ny * overlap;
+
+        // 反射ベクトルを計算
+        const dot = puck.vx * nx + puck.vy * ny;
+        puck.vx = puck.vx - 2 * dot * nx;
+        puck.vy = puck.vy - 2 * dot * ny;
+
+        // 速度を正規化して一定速度を維持
+        const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+        if (speed > 0) {
+          puck.vx = (puck.vx / speed) * PUCK_SPEED * 1.1; // 少し加速
+          puck.vy = (puck.vy / speed) * PUCK_SPEED * 1.1;
         }
       }
 
@@ -624,31 +627,25 @@
       ctx.fillStyle = '#0f346066';
       ctx.fillRect(goalLeft, CANVAS_HEIGHT - 10, GOAL_WIDTH, 10);
 
-      // パドル（相手 - 上/下）
+      // パドル（相手）- 丸いパドル
       ctx.fillStyle = '#e94560';
-      const opponentY = isHost ? PADDLE_MARGIN : CANVAS_HEIGHT - PADDLE_MARGIN;
       ctx.beginPath();
-      ctx.roundRect(
-        CANVAS_WIDTH / 2 - PADDLE_WIDTH / 2,
-        opponentY - PADDLE_HEIGHT / 2,
-        PADDLE_WIDTH,
-        PADDLE_HEIGHT,
-        5
-      );
+      ctx.arc(opponentPaddleX, opponentPaddleY, PADDLE_RADIUS, 0, Math.PI * 2);
       ctx.fill();
+      // 縁取り
+      ctx.strokeStyle = '#ff6b8a';
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
-      // パドル（自分 - 下/上）
+      // パドル（自分）- 丸いパドル
       ctx.fillStyle = '#0f3460';
-      const myY = isHost ? CANVAS_HEIGHT - PADDLE_MARGIN : PADDLE_MARGIN;
       ctx.beginPath();
-      ctx.roundRect(
-        CANVAS_WIDTH / 2 - PADDLE_WIDTH / 2,
-        myY - PADDLE_HEIGHT / 2,
-        PADDLE_WIDTH,
-        PADDLE_HEIGHT,
-        5
-      );
+      ctx.arc(myPaddleX, myPaddleY, PADDLE_RADIUS, 0, Math.PI * 2);
       ctx.fill();
+      // 縁取り
+      ctx.strokeStyle = '#4a90d9';
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
       // パック
       ctx.fillStyle = '#ffffff';
@@ -668,7 +665,7 @@
     // ========================================
     function sendPaddlePosition() {
       if (!client || !client.isConnected) return;
-      client.send({ type: 'paddle', y: myPaddleY });
+      client.send({ type: 'paddle', x: myPaddleX, y: myPaddleY });
     }
 
     function sendPuckState() {
@@ -701,6 +698,7 @@
     function receiveMessage(data) {
       switch (data.type) {
         case 'paddle':
+          opponentPaddleX = data.x;
           opponentPaddleY = data.y;
           break;
         case 'puck':
@@ -761,26 +759,49 @@
     // 入力処理
     // ========================================
     function setupInput() {
-      // マウス移動
-      canvas.addEventListener('mousemove', (e) => {
+      // パドル位置を更新する共通関数
+      function updatePaddlePosition(clientX, clientY) {
         if (gameOver) return;
         const rect = canvas.getBoundingClientRect();
         const scaleX = CANVAS_WIDTH / rect.width;
-        // const mouseX = (e.clientX - rect.left) * scaleX;
-        // パドルはX方向には動かない（中央固定）
+        const scaleY = CANVAS_HEIGHT / rect.height;
+
+        let newX = (clientX - rect.left) * scaleX;
+        let newY = (clientY - rect.top) * scaleY;
+
+        // パドルの移動範囲を制限（自分の領域内のみ）
+        // ホストは下半分、ゲストは上半分
+        const minY = isHost ? CANVAS_HEIGHT / 2 + PADDLE_RADIUS : PADDLE_RADIUS;
+        const maxY = isHost ? CANVAS_HEIGHT - PADDLE_RADIUS : CANVAS_HEIGHT / 2 - PADDLE_RADIUS;
+
+        // X方向の制限
+        newX = Math.max(PADDLE_RADIUS, Math.min(CANVAS_WIDTH - PADDLE_RADIUS, newX));
+        // Y方向の制限
+        newY = Math.max(minY, Math.min(maxY, newY));
+
+        myPaddleX = newX;
+        myPaddleY = newY;
+
         sendPaddlePosition();
+      }
+
+      // マウス移動
+      canvas.addEventListener('mousemove', (e) => {
+        updatePaddlePosition(e.clientX, e.clientY);
       });
 
       // タッチ移動
       canvas.addEventListener('touchmove', (e) => {
-        if (gameOver) return;
         e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
-        // const scaleX = CANVAS_WIDTH / rect.width;
-        // const touchX = (touch.clientX - rect.left) * scaleX;
-        // パドルはX方向には動かない（中央固定）
-        sendPaddlePosition();
+        updatePaddlePosition(touch.clientX, touch.clientY);
+      }, { passive: false });
+
+      // タッチ開始
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        updatePaddlePosition(touch.clientX, touch.clientY);
       }, { passive: false });
     }
 
