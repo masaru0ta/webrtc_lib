@@ -1,0 +1,18 @@
+# Claude Code
+.claude/
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# clasp
+.clasp.json
