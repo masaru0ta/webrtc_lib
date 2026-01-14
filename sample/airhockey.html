@@ -488,7 +488,12 @@
     // ========================================
     // 物理演算（ホストのみ）
     // ========================================
+    let updateCount = 0;
     function updatePuck() {
+      updateCount++;
+      if (updateCount % 60 === 0) {
+        console.log('updatePuck called, puck:', puck.x, puck.y, 'v:', puck.vx, puck.vy);
+      }
       // パック移動
       puck.x += puck.vx;
       puck.y += puck.vy;
@@ -569,7 +574,9 @@
       const minDist = PUCK_RADIUS + PADDLE_RADIUS;
 
       if (distance < minDist && distance > 0) {
-        // 衝突！ パックを押し出す
+        // 衝突！
+        console.log('衝突検出! distance:', distance, 'minDist:', minDist);
+        // パックを押し出す
         const overlap = minDist - distance;
         const nx = dx / distance; // 法線ベクトル
         const ny = dy / distance;
