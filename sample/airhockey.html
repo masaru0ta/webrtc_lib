@@ -389,6 +389,24 @@
     // ========================================
     // 接続処理
     // ========================================
+
+    // データチャネルが開くまで待機する関数
+    function waitForDataChannel() {
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (client && client._dataChannel && client._dataChannel.readyState === 'open') {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+        // 最大10秒でタイムアウト
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          resolve();
+        }, 10000);
+      });
+    }
+
     async function connectToPeer(peerId) {
       try {
         setStatus('接続中...');
@@ -975,15 +993,10 @@
               redirect: 'follow'
             }).catch(() => {});
 
-            // データチャネルが開いているか確認してからゲーム開始
-            if (client._dataChannel && client._dataChannel.readyState === 'open') {
+            // データチャネルが開くまで待ってからゲーム開始
+            waitForDataChannel().then(() => {
               initGame(client._isOfferer);
-            } else if (client._dataChannel) {
-              // まだ開いていない場合はonopenを待つ
-              client._dataChannel.onopen = () => {
-                initGame(client._isOfferer);
-              };
-            }
+            });
           });
 
           client.on('message', (data) => {
