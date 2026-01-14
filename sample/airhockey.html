@@ -296,6 +296,15 @@
       vy: 0
     };
 
+    // ゲスト用：サーバーから受信した正しい位置（補間用）
+    let serverPuck = {
+      x: CANVAS_WIDTH / 2,
+      y: CANVAS_HEIGHT / 2,
+      vx: 0,
+      vy: 0
+    };
+    const INTERPOLATION_FACTOR = 0.3; // 補間係数（0-1、大きいほど速く補正）
+
     // ========================================
     // DOM要素
     // ========================================
@@ -431,6 +440,11 @@
       puck.y = CANVAS_HEIGHT / 2;
       puck.vx = 0;
       puck.vy = 0;
+      // ゲスト用の補間先もリセット
+      serverPuck.x = CANVAS_WIDTH / 2;
+      serverPuck.y = CANVAS_HEIGHT / 2;
+      serverPuck.vx = 0;
+      serverPuck.vy = 0;
     }
 
     function updateScoreDisplay() {
@@ -463,15 +477,60 @@
     function gameLoop() {
       if (gameOver) return;
 
-      // ホストのみ物理演算
+      // ホストは完全な物理演算、ゲストは予測のみ
       if (isHost) {
         updatePuck();
+      } else {
+        updatePuckPrediction();
       }
 
       // 描画
       draw();
 
       animationId = requestAnimationFrame(gameLoop);
+    }
+
+    // ========================================
+    // ゲスト用：パック移動予測（滑らかな表示用）
+    // ========================================
+    function updatePuckPrediction() {
+      // 速度に基づいて位置を予測
+      puck.x += puck.vx;
+      puck.y += puck.vy;
+
+      // 左右の壁との衝突（予測）
+      if (puck.x - PUCK_RADIUS <= 0) {
+        puck.x = PUCK_RADIUS;
+        puck.vx = -puck.vx;
+      } else if (puck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
+        puck.x = CANVAS_WIDTH - PUCK_RADIUS;
+        puck.vx = -puck.vx;
+      }
+
+      // 上下の壁との衝突（予測、ゴールは考慮しない）
+      if (puck.y - PUCK_RADIUS <= 0) {
+        puck.y = PUCK_RADIUS;
+        puck.vy = -puck.vy;
+      } else if (puck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
+        puck.y = CANVAS_HEIGHT - PUCK_RADIUS;
+        puck.vy = -puck.vy;
+      }
+
+      // サーバーからの正しい位置に向かって補間
+      // 位置の差が大きい場合は滑らかに補正
+      const dx = serverPuck.x - puck.x;
+      const dy = serverPuck.y - puck.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > 1) {
+        // 位置を補間
+        puck.x += dx * INTERPOLATION_FACTOR;
+        puck.y += dy * INTERPOLATION_FACTOR;
+      }
+
+      // 速度もサーバーの値に合わせる
+      puck.vx = serverPuck.vx;
+      puck.vy = serverPuck.vy;
     }
 
     // ========================================
@@ -738,10 +797,11 @@
           break;
         case 'puck':
           if (!isHost) {
-            puck.x = data.x;
-            puck.y = data.y;
-            puck.vx = data.vx;
-            puck.vy = data.vy;
+            // サーバーの正しい位置を記録（補間用）
+            serverPuck.x = data.x;
+            serverPuck.y = data.y;
+            serverPuck.vx = data.vx;
+            serverPuck.vy = data.vy;
           }
           break;
         case 'goal':
