@@ -477,7 +477,10 @@
       ctx.fillText(`isHost: ${isHost}`, 5, 15);
       ctx.fillText(`myPaddle: ${Math.round(myPaddleX)},${Math.round(myPaddleY)}`, 5, 27);
       ctx.fillText(`oppPaddle: ${Math.round(opponentPaddleX)},${Math.round(opponentPaddleY)}`, 5, 39);
-      ctx.fillText(`puck: ${Math.round(puck.x)},${Math.round(puck.y)} v:${puck.vx.toFixed(1)},${puck.vy.toFixed(1)}`, 5, 51);
+      ctx.fillText(`puck: ${Math.round(puck.x)},${Math.round(puck.y)} v:${puck.vx.toFixed(2)},${puck.vy.toFixed(2)}`, 5, 51);
+      // パドルとパックの距離
+      const dist1 = Math.sqrt((puck.x - myPaddleX) ** 2 + (puck.y - myPaddleY) ** 2);
+      ctx.fillText(`dist to my: ${dist1.toFixed(1)} (need<45)`, 5, 63);
 
       animationId = requestAnimationFrame(gameLoop);
     }
@@ -595,7 +598,12 @@
             puck.vy = (puck.vy / newSpeed) * PUCK_SPEED * 1.1;
           }
         }
+
+        // 衝突後すぐにパック状態を送信
+        sendPuckState();
+        return true; // 衝突した
       }
+      return false; // 衝突しなかった
     }
 
     // Y座標を反転（ゲスト用）
