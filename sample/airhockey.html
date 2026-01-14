@@ -933,7 +933,15 @@
               redirect: 'follow'
             }).catch(() => {});
 
-            initGame(client._isOfferer);
+            // データチャネルが開いているか確認してからゲーム開始
+            if (client._dataChannel && client._dataChannel.readyState === 'open') {
+              initGame(client._isOfferer);
+            } else if (client._dataChannel) {
+              // まだ開いていない場合はonopenを待つ
+              client._dataChannel.onopen = () => {
+                initGame(client._isOfferer);
+              };
+            }
           });
 
           client.on('message', (data) => {
