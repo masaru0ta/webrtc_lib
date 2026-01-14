@@ -303,7 +303,13 @@
       vx: 0,
       vy: 0
     };
-    const INTERPOLATION_FACTOR = 0.15; // 補間係数（小さくして滑らかに）
+    const INTERPOLATION_FACTOR = 0.2; // 補間係数
+
+    // 遅延補正用
+    let leadFrames = 0; // 先読みフレーム数
+    const MIN_LEAD_FRAMES = 0;
+    const MAX_LEAD_FRAMES = 10;
+    const LEAD_ADJUSTMENT_SPEED = 0.1; // 調整速度
 
     // ========================================
     // DOM要素
@@ -463,6 +469,8 @@
       serverPuck.y = CANVAS_HEIGHT / 2;
       serverPuck.vx = 0;
       serverPuck.vy = 0;
+      // 遅延補正もリセット
+      leadFrames = 0;
     }
 
     function updateScoreDisplay() {
@@ -803,14 +811,51 @@
           break;
         case 'puck':
           if (!isHost) {
-            // サーバーの正しい位置を記録（補間用）
+            // 受信した位置と現在のローカル位置の差を計算
+            const dx = data.x - puck.x;
+            const dy = data.y - puck.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const speed = Math.sqrt(data.vx * data.vx + data.vy * data.vy);
+
+            // 速度がある場合、遅延フレーム数を推定
+            if (speed > 0.1) {
+              const estimatedLag = distance / speed;
+              // 先読みフレーム数を徐々に調整
+              const targetLead = Math.min(MAX_LEAD_FRAMES, Math.max(MIN_LEAD_FRAMES, estimatedLag));
+              leadFrames += (targetLead - leadFrames) * LEAD_ADJUSTMENT_SPEED;
+            }
+
+            // サーバーの位置から先読みシミュレーションを実行
             serverPuck.x = data.x;
             serverPuck.y = data.y;
             serverPuck.vx = data.vx;
             serverPuck.vy = data.vy;
-            // 速度は即座に反映（シミュレーションの方向を合わせる）
-            puck.vx = data.vx;
-            puck.vy = data.vy;
+
+            // 先読みフレーム分だけシミュレーション
+            const frames = Math.round(leadFrames);
+            for (let i = 0; i < frames; i++) {
+              serverPuck.x += serverPuck.vx;
+              serverPuck.y += serverPuck.vy;
+              // 壁反射
+              if (serverPuck.x - PUCK_RADIUS <= 0) {
+                serverPuck.x = PUCK_RADIUS;
+                serverPuck.vx = -serverPuck.vx;
+              } else if (serverPuck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
+                serverPuck.x = CANVAS_WIDTH - PUCK_RADIUS;
+                serverPuck.vx = -serverPuck.vx;
+              }
+              if (serverPuck.y - PUCK_RADIUS <= 0) {
+                serverPuck.y = PUCK_RADIUS;
+                serverPuck.vy = -serverPuck.vy;
+              } else if (serverPuck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
+                serverPuck.y = CANVAS_HEIGHT - PUCK_RADIUS;
+                serverPuck.vy = -serverPuck.vy;
+              }
+            }
+
+            // 速度は即座に反映
+            puck.vx = serverPuck.vx;
+            puck.vy = serverPuck.vy;
           }
           break;
         case 'goal':
