@@ -554,19 +554,13 @@
         }
       }
 
-      // パドルとの衝突（円同士）
-      // ホストのパドル（下半分）
-      const hostPaddleX = isHost ? myPaddleX : opponentPaddleX;
-      const hostPaddleY = isHost ? myPaddleY : opponentPaddleY;
-      checkPaddleCollision(hostPaddleX, hostPaddleY);
-
-      // ゲストのパドル（上半分）
-      const guestPaddleX = isHost ? opponentPaddleX : myPaddleX;
-      const guestPaddleY = isHost ? opponentPaddleY : myPaddleY;
-      checkPaddleCollision(guestPaddleX, guestPaddleY);
-
-      // ホストのみパック状態を送信
+      // パドルとの衝突判定と送信はホストのみ
       if (isHost) {
+        // ホストのパドル（下半分）
+        checkPaddleCollision(myPaddleX, myPaddleY);
+        // ゲストのパドル（上半分）
+        checkPaddleCollision(opponentPaddleX, opponentPaddleY);
+        // パック状態を送信
         sendPuckState();
       }
     }
