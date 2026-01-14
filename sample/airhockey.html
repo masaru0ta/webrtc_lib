@@ -288,7 +288,7 @@
     let opponentPaddleX = CANVAS_WIDTH / 2;
     let opponentPaddleY = 0;
 
-    // パック状態（ホストが管理）
+    // パック状態
     let puck = {
       x: CANVAS_WIDTH / 2,
       y: CANVAS_HEIGHT / 2,
@@ -296,20 +296,11 @@
       vy: 0
     };
 
-    // ゲスト用：サーバーから受信した正しい位置（補間用）
-    let serverPuck = {
+    // ゲスト用：表示位置（滑らかな補間用）
+    let displayPuck = {
       x: CANVAS_WIDTH / 2,
-      y: CANVAS_HEIGHT / 2,
-      vx: 0,
-      vy: 0
+      y: CANVAS_HEIGHT / 2
     };
-    const INTERPOLATION_FACTOR = 0.2; // 補間係数
-
-    // 遅延補正用
-    let leadFrames = 0; // 先読みフレーム数
-    const MIN_LEAD_FRAMES = 0;
-    const MAX_LEAD_FRAMES = 10;
-    const LEAD_ADJUSTMENT_SPEED = 0.1; // 調整速度
 
     // ========================================
     // DOM要素
@@ -464,13 +455,8 @@
       puck.y = CANVAS_HEIGHT / 2;
       puck.vx = 0;
       puck.vy = 0;
-      // ゲスト用の補間先もリセット
-      serverPuck.x = CANVAS_WIDTH / 2;
-      serverPuck.y = CANVAS_HEIGHT / 2;
-      serverPuck.vx = 0;
-      serverPuck.vy = 0;
-      // 遅延補正もリセット
-      leadFrames = 0;
+      displayPuck.x = CANVAS_WIDTH / 2;
+      displayPuck.y = CANVAS_HEIGHT / 2;
     }
 
     function updateScoreDisplay() {
@@ -503,48 +489,21 @@
     function gameLoop() {
       if (gameOver) return;
 
-      // ホストは完全な物理演算、ゲストは予測のみ
+      // ホストのみ物理演算を実行
       if (isHost) {
         updatePuck();
-      } else {
-        updatePuckPrediction();
+      }
+
+      // ゲストは表示位置を滑らかに補間
+      if (!isHost) {
+        displayPuck.x += (puck.x - displayPuck.x) * 0.3;
+        displayPuck.y += (puck.y - displayPuck.y) * 0.3;
       }
 
       // 描画
       draw();
 
       animationId = requestAnimationFrame(gameLoop);
-    }
-
-    // ========================================
-    // ゲスト用：パック移動予測（滑らかな表示用）
-    // ========================================
-    function updatePuckPrediction() {
-      // 速度に基づいて位置をシミュレーション
-      puck.x += puck.vx;
-      puck.y += puck.vy;
-
-      // 壁との衝突処理
-      if (puck.x - PUCK_RADIUS <= 0) {
-        puck.x = PUCK_RADIUS;
-        puck.vx = -puck.vx;
-      } else if (puck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
-        puck.x = CANVAS_WIDTH - PUCK_RADIUS;
-        puck.vx = -puck.vx;
-      }
-      if (puck.y - PUCK_RADIUS <= 0) {
-        puck.y = PUCK_RADIUS;
-        puck.vy = -puck.vy;
-      } else if (puck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
-        puck.y = CANVAS_HEIGHT - PUCK_RADIUS;
-        puck.vy = -puck.vy;
-      }
-
-      // ホストからの正しい位置との差を補正
-      const dx = serverPuck.x - puck.x;
-      const dy = serverPuck.y - puck.y;
-      puck.x += dx * INTERPOLATION_FACTOR;
-      puck.y += dy * INTERPOLATION_FACTOR;
     }
 
     // ========================================
@@ -617,10 +576,8 @@
       const guestPaddleY = isHost ? opponentPaddleY : myPaddleY;
       checkPaddleCollision(guestPaddleX, guestPaddleY);
 
-      // パック状態を送信（5フレームに1回）
-      if (Math.random() < 0.2) {
-        sendPuckState();
-      }
+      // パック状態を毎フレーム送信
+      sendPuckState();
     }
 
     // パドルとパックの衝突判定（円同士）
@@ -715,9 +672,9 @@
       const oppDrawX = opponentPaddleX;
       const oppDrawY = isHost ? opponentPaddleY : flipY(opponentPaddleY);
 
-      // パックの描画位置（ゲストは反転して表示）
-      const puckDrawX = puck.x;
-      const puckDrawY = isHost ? puck.y : flipY(puck.y);
+      // パックの描画位置（ゲストは補間位置を使用、Y座標は反転）
+      const puckDrawX = isHost ? puck.x : displayPuck.x;
+      const puckDrawY = isHost ? puck.y : flipY(displayPuck.y);
 
       // パドル（上側・相手）
       ctx.fillStyle = isHost ? '#0f3460' : '#e94560';  // ホスト視点:青、ゲスト視点:赤
@@ -811,51 +768,11 @@
           break;
         case 'puck':
           if (!isHost) {
-            // 受信した位置と現在のローカル位置の差を計算
-            const dx = data.x - puck.x;
-            const dy = data.y - puck.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const speed = Math.sqrt(data.vx * data.vx + data.vy * data.vy);
-
-            // 速度がある場合、遅延フレーム数を推定
-            if (speed > 0.1) {
-              const estimatedLag = distance / speed;
-              // 先読みフレーム数を徐々に調整
-              const targetLead = Math.min(MAX_LEAD_FRAMES, Math.max(MIN_LEAD_FRAMES, estimatedLag));
-              leadFrames += (targetLead - leadFrames) * LEAD_ADJUSTMENT_SPEED;
-            }
-
-            // サーバーの位置から先読みシミュレーションを実行
-            serverPuck.x = data.x;
-            serverPuck.y = data.y;
-            serverPuck.vx = data.vx;
-            serverPuck.vy = data.vy;
-
-            // 先読みフレーム分だけシミュレーション
-            const frames = Math.round(leadFrames);
-            for (let i = 0; i < frames; i++) {
-              serverPuck.x += serverPuck.vx;
-              serverPuck.y += serverPuck.vy;
-              // 壁反射
-              if (serverPuck.x - PUCK_RADIUS <= 0) {
-                serverPuck.x = PUCK_RADIUS;
-                serverPuck.vx = -serverPuck.vx;
-              } else if (serverPuck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
-                serverPuck.x = CANVAS_WIDTH - PUCK_RADIUS;
-                serverPuck.vx = -serverPuck.vx;
-              }
-              if (serverPuck.y - PUCK_RADIUS <= 0) {
-                serverPuck.y = PUCK_RADIUS;
-                serverPuck.vy = -serverPuck.vy;
-              } else if (serverPuck.y + PUCK_RADIUS >= CANVAS_HEIGHT) {
-                serverPuck.y = CANVAS_HEIGHT - PUCK_RADIUS;
-                serverPuck.vy = -serverPuck.vy;
-              }
-            }
-
-            // 速度は即座に反映
-            puck.vx = serverPuck.vx;
-            puck.vy = serverPuck.vy;
+            // ホストから受信した位置をそのまま反映
+            puck.x = data.x;
+            puck.y = data.y;
+            puck.vx = data.vx;
+            puck.vy = data.vy;
           }
           break;
         case 'goal':
