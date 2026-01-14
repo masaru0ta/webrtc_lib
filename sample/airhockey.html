@@ -765,8 +765,11 @@
             const dy = data.y - puck.y;
             const distSq = dx * dx + dy * dy;
 
+            console.log(`puck受信: distSq=${distSq.toFixed(0)}, threshold=${TELEPORT_THRESHOLD}, teleport=${distSq > TELEPORT_THRESHOLD}`);
+
             if (distSq > TELEPORT_THRESHOLD) {
               // テレポート：即座に補正
+              console.log(`テレポート: (${puck.x.toFixed(0)},${puck.y.toFixed(0)}) → (${data.x.toFixed(0)},${data.y.toFixed(0)})`);
               puck.x = data.x;
               puck.y = data.y;
             } else {
