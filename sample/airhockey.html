@@ -562,6 +562,11 @@
       const guestPaddleX = isHost ? opponentPaddleX : myPaddleX;
       const guestPaddleY = isHost ? opponentPaddleY : myPaddleY;
       checkPaddleCollision(guestPaddleX, guestPaddleY);
+
+      // パック状態を送信（5フレームに1回）
+      if (Math.random() < 0.2) {
+        sendPuckState();
+      }
     }
 
     // パドルとパックの衝突判定（円同士）
@@ -592,11 +597,6 @@
           puck.vx = (puck.vx / speed) * PUCK_SPEED * 1.1; // 少し加速
           puck.vy = (puck.vy / speed) * PUCK_SPEED * 1.1;
         }
-      }
-
-      // パック状態を送信（5フレームに1回）
-      if (Math.random() < 0.2) {
-        sendPuckState();
       }
     }
 
