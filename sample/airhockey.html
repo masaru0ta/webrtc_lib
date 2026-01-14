@@ -268,6 +268,11 @@
     const WINNING_SCORE = 5;
     const PUCK_SPEED = 5;
 
+    // 物理定数
+    const FRICTION = 0.995;       // 摩擦係数（毎フレーム速度に掛ける）
+    const RESTITUTION = 0.9;      // 反発係数（壁・パドル衝突時）
+    const PUCK_SPEED_LIMIT = 15;  // パックの最高速度
+
     // ========================================
     // ゲーム状態
     // ========================================
@@ -285,8 +290,12 @@
     // パドル位置（X, Y位置）
     let myPaddleX = CANVAS_WIDTH / 2;
     let myPaddleY = 0;
+    let myPaddlePrevX = CANVAS_WIDTH / 2;  // 前フレームの位置（スウィープ衝突検出用）
+    let myPaddlePrevY = 0;
     let opponentPaddleX = CANVAS_WIDTH / 2;
     let opponentPaddleY = 0;
+    let opponentPaddlePrevX = CANVAS_WIDTH / 2;  // 前フレームの位置（スウィープ衝突検出用）
+    let opponentPaddlePrevY = 0;
 
     // パック状態
     let puck = {
@@ -426,8 +435,12 @@
       // パドル初期位置（自分は常に下半分）
       myPaddleX = CANVAS_WIDTH / 2;
       myPaddleY = CANVAS_HEIGHT * 3 / 4;
+      myPaddlePrevX = myPaddleX;
+      myPaddlePrevY = myPaddleY;
       opponentPaddleX = CANVAS_WIDTH / 2;
       opponentPaddleY = CANVAS_HEIGHT / 4;
+      opponentPaddlePrevX = opponentPaddleX;
+      opponentPaddlePrevY = opponentPaddleY;
 
       // パック初期化
       resetPuck();
@@ -497,17 +510,28 @@
     // 物理演算（両プレイヤーで実行）
     // ========================================
     function updatePuck() {
+      // 摩擦を適用
+      puck.vx *= FRICTION;
+      puck.vy *= FRICTION;
+
+      // 速度制限
+      const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+      if (speed > PUCK_SPEED_LIMIT) {
+        puck.vx = (puck.vx / speed) * PUCK_SPEED_LIMIT;
+        puck.vy = (puck.vy / speed) * PUCK_SPEED_LIMIT;
+      }
+
       // パック移動
       puck.x += puck.vx;
       puck.y += puck.vy;
 
-      // 左右の壁との衝突
+      // 左右の壁との衝突（反発係数を適用）
       if (puck.x - PUCK_RADIUS <= 0) {
         puck.x = PUCK_RADIUS;
-        puck.vx = -puck.vx;
+        puck.vx = -puck.vx * RESTITUTION;
       } else if (puck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
         puck.x = CANVAS_WIDTH - PUCK_RADIUS;
-        puck.vx = -puck.vx;
+        puck.vx = -puck.vx * RESTITUTION;
       }
 
       // ゴール判定（上下）
@@ -530,7 +554,7 @@
           return;
         } else {
           puck.y = PUCK_RADIUS;
-          puck.vy = -puck.vy;
+          puck.vy = -puck.vy * RESTITUTION;
         }
       }
 
@@ -550,23 +574,77 @@
           return;
         } else {
           puck.y = CANVAS_HEIGHT - PUCK_RADIUS;
-          puck.vy = -puck.vy;
+          puck.vy = -puck.vy * RESTITUTION;
         }
       }
 
-      // パドルとの衝突判定と送信はホストのみ
+      // パドルとの衝突判定はホストのみ（スウィープ衝突検出を使用）
       if (isHost) {
         // ホストのパドル（下半分）
-        checkPaddleCollision(myPaddleX, myPaddleY);
+        checkSweepPaddleCollision(myPaddleX, myPaddleY, myPaddlePrevX, myPaddlePrevY);
         // ゲストのパドル（上半分）
-        checkPaddleCollision(opponentPaddleX, opponentPaddleY);
+        checkSweepPaddleCollision(opponentPaddleX, opponentPaddleY, opponentPaddlePrevX, opponentPaddlePrevY);
         // パック状態を送信
         sendPuckState();
       }
+
+      // パドルの前フレーム位置を更新
+      myPaddlePrevX = myPaddleX;
+      myPaddlePrevY = myPaddleY;
+      opponentPaddlePrevX = opponentPaddleX;
+      opponentPaddlePrevY = opponentPaddleY;
     }
 
-    // パドルとパックの衝突判定（円同士）
-    function checkPaddleCollision(paddleX, paddleY) {
+    // スウィープ衝突検出：パドルの移動軌跡を考慮した衝突判定
+    // パドルが高速移動してもすり抜けを防止
+    function checkSweepPaddleCollision(paddleX, paddleY, prevX, prevY) {
+      // パドルの移動線分: (prevX, prevY) -> (paddleX, paddleY)
+      const lineX1 = prevX;
+      const lineY1 = prevY;
+      const lineX2 = paddleX;
+      const lineY2 = paddleY;
+
+      // 衝突半径（パドル半径 + パック半径）
+      const collisionRadius = PADDLE_RADIUS + PUCK_RADIUS;
+
+      // 線分の長さの2乗
+      const lineLenSq = (lineX2 - lineX1) * (lineX2 - lineX1) +
+                        (lineY2 - lineY1) * (lineY2 - lineY1);
+
+      // パドルがほぼ動いていない場合は通常判定
+      if (lineLenSq < 1) {
+        return checkStaticPaddleCollision(paddleX, paddleY, 0, 0);
+      }
+
+      // パックの中心から線分への最近点を計算
+      let t = ((puck.x - lineX1) * (lineX2 - lineX1) +
+               (puck.y - lineY1) * (lineY2 - lineY1)) / lineLenSq;
+
+      // tを0〜1にクランプ（線分上に制限）
+      t = Math.max(0, Math.min(1, t));
+
+      // 線分上の最近点
+      const nearestX = lineX1 + t * (lineX2 - lineX1);
+      const nearestY = lineY1 + t * (lineY2 - lineY1);
+
+      // 最近点とパック中心の距離
+      const dx = puck.x - nearestX;
+      const dy = puck.y - nearestY;
+      const distSq = dx * dx + dy * dy;
+
+      // 衝突半径より近ければ衝突
+      if (distSq < collisionRadius * collisionRadius) {
+        // パドルの速度を計算（前フレームから現在への移動）
+        const paddleVx = paddleX - prevX;
+        const paddleVy = paddleY - prevY;
+        return checkStaticPaddleCollision(paddleX, paddleY, paddleVx, paddleVy);
+      }
+
+      return false;
+    }
+
+    // パドルとパックの衝突判定（パドル速度を考慮）
+    function checkStaticPaddleCollision(paddleX, paddleY, paddleVx, paddleVy) {
       const dx = puck.x - paddleX;
       const dy = puck.y - paddleY;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -575,39 +653,78 @@
       if (distance < minDist && distance > 0) {
         // 衝突！パックを押し出す
         const overlap = minDist - distance;
-        const nx = dx / distance; // 法線ベクトル
+        const nx = dx / distance; // 法線ベクトル（パドルからパックへの方向）
         const ny = dy / distance;
 
         // パックを押し出す
         puck.x += nx * overlap;
         puck.y += ny * overlap;
 
-        // パックの速度を計算
-        const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+        // パドルの速度
+        const paddleSpeed = Math.sqrt(paddleVx * paddleVx + paddleVy * paddleVy);
 
-        if (speed < 0.1) {
-          // パックが静止している場合、パドルから離れる方向に発射
-          puck.vx = nx * PUCK_SPEED;
-          puck.vy = ny * PUCK_SPEED;
-        } else {
-          // 反射ベクトルを計算
-          const dot = puck.vx * nx + puck.vy * ny;
-          puck.vx = puck.vx - 2 * dot * nx;
-          puck.vy = puck.vy - 2 * dot * ny;
+        // パドルが相手ゴール方向（上方向）に動いているか
+        const isMovingForward = paddleY < CANVAS_HEIGHT / 2 ? paddleVy > 0 : paddleVy < 0;
 
-          // 速度を正規化して一定速度を維持
-          const newSpeed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
-          if (newSpeed > 0) {
-            puck.vx = (puck.vx / newSpeed) * PUCK_SPEED * 1.1;
-            puck.vy = (puck.vy / newSpeed) * PUCK_SPEED * 1.1;
+        if (paddleSpeed < 0.5) {
+          // パドルが静止している場合
+          const puckSpeed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+
+          if (puckSpeed < 0.5) {
+            // パックも静止：パドルから離れる方向に発射
+            puck.vx = nx * PUCK_SPEED;
+            puck.vy = ny * PUCK_SPEED;
+          } else {
+            // パックが動いている：反射
+            const dot = puck.vx * nx + puck.vy * ny;
+            puck.vx = (puck.vx - 2 * dot * nx) * RESTITUTION;
+            puck.vy = (puck.vy - 2 * dot * ny) * RESTITUTION;
           }
+        } else {
+          // パドルが動いている：パドルの動きをパックに伝える
+
+          // パドルの進行方向に基づいて打ち返す力を計算
+          const hitStrength = Math.max(paddleSpeed * 1.5, PUCK_SPEED);
+
+          // パックが自陣方向に飛びそうな場合は補正
+          const forwardDir = paddleY < CANVAS_HEIGHT / 2 ? 1 : -1;  // 上半分は下向き、下半分は上向き
+          let finalNy = ny;
+
+          // パックが後ろに飛びそうで、パドルが前進中なら補正
+          if (ny * forwardDir > 0 && isMovingForward) {
+            // パドルの横位置によって角度を決定
+            const xOffset = dx / PADDLE_RADIUS;
+            finalNy = -Math.abs(ny) * forwardDir * -1;
+            const finalNx = xOffset * 0.8;
+            const len = Math.sqrt(finalNx * finalNx + finalNy * finalNy);
+            if (len > 0) {
+              puck.vx = (finalNx / len) * hitStrength + paddleVx * 0.3;
+              puck.vy = (finalNy / len) * hitStrength;
+            }
+          } else {
+            // 通常の衝突
+            puck.vx = nx * hitStrength + paddleVx * 0.3;
+            puck.vy = ny * hitStrength + paddleVy * 0.3;
+          }
+        }
+
+        // 速度制限を適用
+        const newSpeed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+        if (newSpeed > PUCK_SPEED_LIMIT) {
+          puck.vx = (puck.vx / newSpeed) * PUCK_SPEED_LIMIT;
+          puck.vy = (puck.vy / newSpeed) * PUCK_SPEED_LIMIT;
         }
 
         // 衝突後すぐにパック状態を送信
         sendPuckState();
-        return true; // 衝突した
+        return true;
       }
-      return false; // 衝突しなかった
+      return false;
+    }
+
+    // 旧バージョンの関数（互換性のため残す）
+    function checkPaddleCollision(paddleX, paddleY) {
+      return checkStaticPaddleCollision(paddleX, paddleY, 0, 0);
     }
 
     // Y座標を反転（ゲスト用）
