@@ -402,16 +402,11 @@
       hostScore = 0;
       guestScore = 0;
 
-      // パドル初期位置（ホストは下半分、ゲストは上半分）
+      // パドル初期位置（自分は常に下半分）
       myPaddleX = CANVAS_WIDTH / 2;
+      myPaddleY = CANVAS_HEIGHT * 3 / 4;
       opponentPaddleX = CANVAS_WIDTH / 2;
-      if (isHost) {
-        myPaddleY = CANVAS_HEIGHT * 3 / 4;
-        opponentPaddleY = CANVAS_HEIGHT / 4;
-      } else {
-        myPaddleY = CANVAS_HEIGHT / 4;
-        opponentPaddleY = CANVAS_HEIGHT * 3 / 4;
-      }
+      opponentPaddleY = CANVAS_HEIGHT / 4;
 
       // パック初期化
       resetPuck();
@@ -586,6 +581,11 @@
       }
     }
 
+    // Y座標を反転（ゲスト用）
+    function flipY(y) {
+      return CANVAS_HEIGHT - y;
+    }
+
     // ========================================
     // 描画
     // ========================================
@@ -611,46 +611,55 @@
 
       // ゴールエリア
       const goalLeft = (CANVAS_WIDTH - GOAL_WIDTH) / 2;
-      const goalRight = (CANVAS_WIDTH + GOAL_WIDTH) / 2;
 
-      // 上ゴール
-      ctx.fillStyle = '#e9456066';
+      // ゴールの色（自分のゴールが下）
+      const myGoalColor = isHost ? '#e9456066' : '#0f346066';  // ホスト=赤、ゲスト=青
+      const oppGoalColor = isHost ? '#0f346066' : '#e9456066';
+
+      // 上ゴール（相手のゴール）
+      ctx.fillStyle = oppGoalColor;
       ctx.fillRect(goalLeft, 0, GOAL_WIDTH, 10);
 
-      // 下ゴール
-      ctx.fillStyle = '#0f346066';
+      // 下ゴール（自分のゴール）
+      ctx.fillStyle = myGoalColor;
       ctx.fillRect(goalLeft, CANVAS_HEIGHT - 10, GOAL_WIDTH, 10);
 
-      // パドル（相手）- 丸いパドル
-      ctx.fillStyle = '#e94560';
+      // 相手のパドル位置（ゲストは反転して表示）
+      const oppDrawX = opponentPaddleX;
+      const oppDrawY = isHost ? opponentPaddleY : flipY(opponentPaddleY);
+
+      // パックの描画位置（ゲストは反転して表示）
+      const puckDrawX = puck.x;
+      const puckDrawY = isHost ? puck.y : flipY(puck.y);
+
+      // パドル（上側・相手）
+      ctx.fillStyle = isHost ? '#0f3460' : '#e94560';  // ホスト視点:青、ゲスト視点:赤
       ctx.beginPath();
-      ctx.arc(opponentPaddleX, opponentPaddleY, PADDLE_RADIUS, 0, Math.PI * 2);
+      ctx.arc(oppDrawX, oppDrawY, PADDLE_RADIUS, 0, Math.PI * 2);
       ctx.fill();
-      // 縁取り
-      ctx.strokeStyle = '#ff6b8a';
+      ctx.strokeStyle = isHost ? '#4a90d9' : '#ff6b8a';
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // パドル（自分）- 丸いパドル
-      ctx.fillStyle = '#0f3460';
+      // パドル（下側・自分）
+      ctx.fillStyle = isHost ? '#e94560' : '#0f3460';  // ホスト=赤、ゲスト=青
       ctx.beginPath();
       ctx.arc(myPaddleX, myPaddleY, PADDLE_RADIUS, 0, Math.PI * 2);
       ctx.fill();
-      // 縁取り
-      ctx.strokeStyle = '#4a90d9';
+      ctx.strokeStyle = isHost ? '#ff6b8a' : '#4a90d9';
       ctx.lineWidth = 3;
       ctx.stroke();
 
       // パック
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(puck.x, puck.y, PUCK_RADIUS, 0, Math.PI * 2);
+      ctx.arc(puckDrawX, puckDrawY, PUCK_RADIUS, 0, Math.PI * 2);
       ctx.fill();
 
       // パックの影
       ctx.fillStyle = '#00000033';
       ctx.beginPath();
-      ctx.ellipse(puck.x + 3, puck.y + 3, PUCK_RADIUS, PUCK_RADIUS * 0.8, 0, 0, Math.PI * 2);
+      ctx.ellipse(puckDrawX + 3, puckDrawY + 3, PUCK_RADIUS, PUCK_RADIUS * 0.8, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -659,7 +668,9 @@
     // ========================================
     function sendPaddlePosition() {
       if (!client || !client.isConnected) return;
-      client.send({ type: 'paddle', x: myPaddleX, y: myPaddleY });
+      // ゲストはY座標を反転してホスト座標系で送信
+      const sendY = isHost ? myPaddleY : flipY(myPaddleY);
+      client.send({ type: 'paddle', x: myPaddleX, y: sendY });
     }
 
     function sendPuckState() {
@@ -763,10 +774,9 @@
         let newX = (clientX - rect.left) * scaleX;
         let newY = (clientY - rect.top) * scaleY;
 
-        // パドルの移動範囲を制限（自分の領域内のみ）
-        // ホストは下半分、ゲストは上半分
-        const minY = isHost ? CANVAS_HEIGHT / 2 + PADDLE_RADIUS : PADDLE_RADIUS;
-        const maxY = isHost ? CANVAS_HEIGHT - PADDLE_RADIUS : CANVAS_HEIGHT / 2 - PADDLE_RADIUS;
+        // パドルの移動範囲を制限（常に下半分）
+        const minY = CANVAS_HEIGHT / 2 + PADDLE_RADIUS;
+        const maxY = CANVAS_HEIGHT - PADDLE_RADIUS;
 
         // X方向の制限
         newX = Math.max(PADDLE_RADIUS, Math.min(CANVAS_WIDTH - PADDLE_RADIUS, newX));
