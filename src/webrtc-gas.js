@@ -78,6 +78,7 @@
      * @param {string} [options.id] - ユーザーID（省略時は自動発行）
      * @param {string} [options.globalIp] - グローバルIP
      * @param {string[]} [options.friendList] - フレンドIDリスト
+     * @param {string} [options.passphrase] - あいことば
      * @param {number} [options.pollingInterval=2000] - ポーリング間隔（ミリ秒）
      */
     constructor(options) {
@@ -96,6 +97,7 @@
       this.id = options.id || null;
       this.globalIp = options.globalIp || '';
       this.friendList = options.friendList || [];
+      this.passphrase = options.passphrase || '';
       this.pollingInterval = options.pollingInterval || 2000;
 
       // 状態
@@ -125,7 +127,8 @@
           id: this.id,
           name: this.name,
           global_ip: this.globalIp,
-          friend_list: this.friendList
+          friend_list: this.friendList,
+          passphrase: this.passphrase
         });
 
         if (!response.success) {

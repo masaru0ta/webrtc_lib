@@ -201,6 +201,152 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* 設定セクション */
+    .settings-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+
+    .settings-toggle {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      width: 100%;
+      padding: 10px;
+    }
+
+    .settings-toggle:hover {
+      color: #e94560;
+    }
+
+    .settings-toggle .arrow {
+      transition: transform 0.3s;
+    }
+
+    .settings-toggle.open .arrow {
+      transform: rotate(180deg);
+    }
+
+    .settings-content {
+      display: none;
+      margin-top: 15px;
+    }
+
+    .settings-content.open {
+      display: block;
+    }
+
+    .setting-item {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+
+    .setting-label {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 5px;
+      display: block;
+    }
+
+    .setting-input {
+      width: 100%;
+      padding: 10px 15px;
+      border: 2px solid #eee;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .setting-input:focus {
+      outline: none;
+      border-color: #e94560;
+    }
+
+    .setting-help {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+
+    .friend-list-container {
+      max-height: 150px;
+      overflow-y: auto;
+      border: 2px solid #eee;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .friend-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      background: #f9f9f9;
+      border-radius: 5px;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .friend-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .friend-id {
+      color: #666;
+      font-family: monospace;
+    }
+
+    .friend-remove {
+      background: none;
+      border: none;
+      color: #e94560;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 5px;
+    }
+
+    .friend-remove:hover {
+      color: #c13050;
+    }
+
+    .add-friend-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .add-friend-row input {
+      flex: 1;
+    }
+
+    .btn-add-friend {
+      padding: 10px 15px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-add-friend:hover {
+      background: #c13050;
+    }
+
+    .empty-list {
+      color: #999;
+      font-size: 13px;
+      text-align: center;
+      padding: 20px;
+    }
   </style>
 </head>
 <body>
@@ -217,6 +363,35 @@
       <button class="btn" id="btn-start">マッチング開始</button>
 
       <div class="status" id="status">準備完了</div>
+
+      <!-- 設定セクション -->
+      <div class="settings-section">
+        <button class="settings-toggle" id="settings-toggle">
+          <span>設定</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="settings-content" id="settings-content">
+          <!-- あいことば設定 -->
+          <div class="setting-item">
+            <label class="setting-label">あいことば</label>
+            <input type="text" class="setting-input" id="input-passphrase" placeholder="あいことばを入力">
+            <div class="setting-help">同じあいことばを設定した人とのみマッチングします</div>
+          </div>
+
+          <!-- フレンドリスト設定 -->
+          <div class="setting-item">
+            <label class="setting-label">フレンドリスト</label>
+            <div class="friend-list-container" id="friend-list-container">
+              <div class="empty-list" id="empty-friend-list">フレンドがいません</div>
+            </div>
+            <div class="add-friend-row">
+              <input type="text" class="setting-input" id="input-friend-id" placeholder="フレンドIDを入力">
+              <button class="btn-add-friend" id="btn-add-friend">追加</button>
+            </div>
+            <div class="setting-help">フレンドIDを追加すると、そのプレイヤーと優先的にマッチングします</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ゲーム画面 -->
@@ -256,7 +431,8 @@
     const STORAGE_KEYS = {
       MY_ID: 'airhockey_myId',
       MY_NAME: 'airhockey_myName',
-      FRIEND_LIST: 'airhockey_friendList'
+      FRIEND_LIST: 'airhockey_friendList',
+      PASSPHRASE: 'airhockey_passphrase'
     };
 
     // ゲーム定数
@@ -324,7 +500,15 @@
       gameCanvas: document.getElementById('game-canvas'),
       result: document.getElementById('result'),
       btnRematch: document.getElementById('btn-rematch'),
-      btnDisconnect: document.getElementById('btn-disconnect')
+      btnDisconnect: document.getElementById('btn-disconnect'),
+      // 設定関連
+      settingsToggle: document.getElementById('settings-toggle'),
+      settingsContent: document.getElementById('settings-content'),
+      inputPassphrase: document.getElementById('input-passphrase'),
+      friendListContainer: document.getElementById('friend-list-container'),
+      emptyFriendList: document.getElementById('empty-friend-list'),
+      inputFriendId: document.getElementById('input-friend-id'),
+      btnAddFriend: document.getElementById('btn-add-friend')
     };
 
     // ========================================
@@ -334,7 +518,8 @@
       return {
         myId: localStorage.getItem(STORAGE_KEYS.MY_ID) || null,
         myName: localStorage.getItem(STORAGE_KEYS.MY_NAME) || null,
-        friendList: JSON.parse(localStorage.getItem(STORAGE_KEYS.FRIEND_LIST) || '[]')
+        friendList: JSON.parse(localStorage.getItem(STORAGE_KEYS.FRIEND_LIST) || '[]'),
+        passphrase: localStorage.getItem(STORAGE_KEYS.PASSPHRASE) || ''
       };
     }
 
@@ -351,6 +536,35 @@
       if (!data.friendList.includes(friendId)) {
         data.friendList.push(friendId);
         saveToStorage(STORAGE_KEYS.FRIEND_LIST, data.friendList);
+      }
+      return data.friendList;
+    }
+
+    function removeFriend(friendId) {
+      const data = loadFromStorage();
+      const newList = data.friendList.filter(id => id !== friendId);
+      saveToStorage(STORAGE_KEYS.FRIEND_LIST, newList);
+      return newList;
+    }
+
+    function renderFriendList(friendList) {
+      // 既存のフレンドアイテムを削除（空リスト表示は残す）
+      const items = elements.friendListContainer.querySelectorAll('.friend-item');
+      items.forEach(item => item.remove());
+
+      if (friendList.length === 0) {
+        elements.emptyFriendList.style.display = 'block';
+      } else {
+        elements.emptyFriendList.style.display = 'none';
+        friendList.forEach(friendId => {
+          const item = document.createElement('div');
+          item.className = 'friend-item';
+          item.innerHTML = `
+            <span class="friend-id">${friendId}</span>
+            <button class="friend-remove" data-id="${friendId}">×</button>
+          `;
+          elements.friendListContainer.appendChild(item);
+        });
       }
     }
 
@@ -446,7 +660,8 @@
       resetPuck();
 
       // フレンドリストに追加
-      addFriend(client.peerId);
+      const newFriendList = addFriend(client.peerId);
+      renderFriendList(newFriendList);
 
       // UI更新
       elements.opponentName.textContent = client.peerName || client.peerId;
@@ -1000,6 +1215,40 @@
       elements.myName.textContent = myName;
       elements.myId.textContent = stored.myId ? `ID: ${stored.myId}` : 'ID: 未登録';
 
+      // 設定UIの初期化
+      elements.inputPassphrase.value = stored.passphrase;
+      renderFriendList(stored.friendList);
+
+      // 設定トグル
+      elements.settingsToggle.addEventListener('click', () => {
+        elements.settingsToggle.classList.toggle('open');
+        elements.settingsContent.classList.toggle('open');
+      });
+
+      // あいことば変更
+      elements.inputPassphrase.addEventListener('change', () => {
+        saveToStorage(STORAGE_KEYS.PASSPHRASE, elements.inputPassphrase.value);
+      });
+
+      // フレンド追加
+      elements.btnAddFriend.addEventListener('click', () => {
+        const friendId = elements.inputFriendId.value.trim();
+        if (friendId) {
+          const newList = addFriend(friendId);
+          renderFriendList(newList);
+          elements.inputFriendId.value = '';
+        }
+      });
+
+      // フレンド削除（イベント委譲）
+      elements.friendListContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('friend-remove')) {
+          const friendId = e.target.dataset.id;
+          const newList = removeFriend(friendId);
+          renderFriendList(newList);
+        }
+      });
+
       // 入力設定
       setupInput();
 
@@ -1014,13 +1263,18 @@
 
           setStatus('登録中...');
 
+          // 現在の設定値を取得
+          const currentPassphrase = elements.inputPassphrase.value.trim();
+          const currentFriendList = loadFromStorage().friendList;
+
           // クライアント作成
           client = new WebRTCGAS.Client({
             apiUrl: API_URL,
             name: myName,
             id: stored.myId,
             globalIp: globalIp,
-            friendList: stored.friendList,
+            friendList: currentFriendList,
+            passphrase: currentPassphrase,
             pollingInterval: 2000
           });
 
