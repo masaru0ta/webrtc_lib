@@ -491,6 +491,132 @@
       playBeep(440, 0.08, 0.3);
     }
 
+    // ゴール音（ファンファーレ風）
+    function playGoalSound(isMyGoal) {
+      if (!audioContext) return;
+
+      if (isMyGoal) {
+        // 失点：下降音
+        playBeep(400, 0.15, 0.3);
+        setTimeout(() => playBeep(300, 0.15, 0.3), 150);
+        setTimeout(() => playBeep(200, 0.3, 0.3), 300);
+      } else {
+        // 得点：上昇ファンファーレ
+        playBeep(523, 0.1, 0.3);  // C5
+        setTimeout(() => playBeep(659, 0.1, 0.3), 100);  // E5
+        setTimeout(() => playBeep(784, 0.1, 0.3), 200);  // G5
+        setTimeout(() => playBeep(1047, 0.3, 0.4), 300); // C6
+      }
+    }
+
+    // ========================================
+    // ゴール演出
+    // ========================================
+    let goalEffect = null;
+
+    function startGoalEffect(scorerIsHost) {
+      // 自分のゴールかどうか判定
+      const isMyGoal = (isHost && scorerIsHost) || (!isHost && !scorerIsHost);
+
+      // サウンド再生
+      playGoalSound(!isMyGoal);
+
+      goalEffect = {
+        startTime: Date.now(),
+        duration: 1500,  // 1.5秒
+        isMyGoal: isMyGoal,
+        particles: [],
+        flashAlpha: 1.0
+      };
+
+      // パーティクル生成
+      const goalY = isMyGoal ? CANVAS_HEIGHT : 0;
+      for (let i = 0; i < 30; i++) {
+        goalEffect.particles.push({
+          x: CANVAS_WIDTH / 2 + (Math.random() - 0.5) * GOAL_WIDTH,
+          y: goalY,
+          vx: (Math.random() - 0.5) * 8,
+          vy: isMyGoal ? -Math.random() * 10 - 5 : Math.random() * 10 + 5,
+          size: Math.random() * 8 + 4,
+          color: isMyGoal ? '#e94560' : '#4CAF50',
+          alpha: 1.0
+        });
+      }
+    }
+
+    function updateGoalEffect() {
+      if (!goalEffect) return false;
+
+      const elapsed = Date.now() - goalEffect.startTime;
+      if (elapsed > goalEffect.duration) {
+        goalEffect = null;
+        return false;
+      }
+
+      const progress = elapsed / goalEffect.duration;
+
+      // フラッシュ効果の減衰
+      goalEffect.flashAlpha = Math.max(0, 1 - progress * 2);
+
+      // パーティクル更新
+      goalEffect.particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.3;  // 重力
+        p.alpha = 1 - progress;
+      });
+
+      return true;
+    }
+
+    function drawGoalEffect() {
+      if (!goalEffect) return;
+
+      // 画面フラッシュ
+      if (goalEffect.flashAlpha > 0) {
+        const flashColor = goalEffect.isMyGoal ?
+          `rgba(233, 69, 96, ${goalEffect.flashAlpha * 0.3})` :
+          `rgba(76, 175, 80, ${goalEffect.flashAlpha * 0.3})`;
+        ctx.fillStyle = flashColor;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
+
+      // パーティクル描画
+      goalEffect.particles.forEach(p => {
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0;
+
+      // テキスト表示
+      const elapsed = Date.now() - goalEffect.startTime;
+      if (elapsed < 1000) {
+        const scale = 1 + Math.sin(elapsed / 50) * 0.1;
+        const textAlpha = Math.min(1, elapsed / 200);
+
+        ctx.save();
+        ctx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        ctx.scale(scale, scale);
+
+        ctx.globalAlpha = textAlpha;
+        ctx.fillStyle = goalEffect.isMyGoal ? '#e94560' : '#4CAF50';
+        ctx.font = 'bold 48px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // 縁取り
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.strokeText(goalEffect.isMyGoal ? '失点...' : 'GOAL!', 0, 0);
+        ctx.fillText(goalEffect.isMyGoal ? '失点...' : 'GOAL!', 0, 0);
+
+        ctx.restore();
+      }
+    }
+
     // ========================================
     // ゲーム状態
     // ========================================
@@ -694,7 +820,8 @@
       myPaddlePrevX = myPaddleX;
       myPaddlePrevY = myPaddleY;
       opponentPaddleX = CANVAS_WIDTH / 2;
-      opponentPaddleY = CANVAS_HEIGHT / 4;
+      // 相手パドルの初期Y位置はホスト座標系で設定（描画時にゲストは反転する）
+      opponentPaddleY = CANVAS_HEIGHT * 3 / 4;  // ホスト座標系での相手の位置
       opponentPaddlePrevX = opponentPaddleX;
       opponentPaddlePrevY = opponentPaddleY;
 
@@ -757,8 +884,14 @@
       // 両方で物理演算を実行（ローカルシミュレーション）
       updatePuck();
 
+      // ゴール演出更新
+      updateGoalEffect();
+
       // 描画
       draw();
+
+      // ゴール演出描画
+      drawGoalEffect();
 
       animationId = requestAnimationFrame(gameLoop);
     }
@@ -802,6 +935,7 @@
         if (puck.x >= goalLeft && puck.x <= goalRight) {
           if (isHost) {
             hostScore++;
+            startGoalEffect(false);  // ゲストのゴールにホストが得点
             sendGoal('host');
             if (hostScore >= WINNING_SCORE) {
               endGame('host');
@@ -823,6 +957,7 @@
         if (puck.x >= goalLeft && puck.x <= goalRight) {
           if (isHost) {
             guestScore++;
+            startGoalEffect(true);  // ホストのゴールにゲストが得点
             sendGoal('guest');
             if (guestScore >= WINNING_SCORE) {
               endGame('guest');
@@ -1149,6 +1284,8 @@
           hostScore = data.hostScore;
           guestScore = data.guestScore;
           updateScoreDisplay();
+          // ゲスト側でもゴール演出を開始（scorerがhostならホストが得点＝ゲストのゴール）
+          startGoalEffect(data.scorer === 'guest');
           if (hostScore >= WINNING_SCORE) {
             endGame('host');
           } else if (guestScore >= WINNING_SCORE) {
