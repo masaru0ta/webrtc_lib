@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC-GAS サンプルゲーム</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .game-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .game-link {
+      display: block;
+      padding: 20px;
+      border-radius: 12px;
+      text-decoration: none;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .game-link:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .game-link.tictactoe {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .game-link.airhockey {
+      background: linear-gradient(135deg, #e94560 0%, #0f3460 100%);
+    }
+
+    .game-description {
+      font-size: 12px;
+      font-weight: normal;
+      opacity: 0.9;
+      margin-top: 5px;
+    }
+
+    .footer {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      font-size: 12px;
+      color: #999;
+    }
+
+    .footer a {
+      color: #667eea;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WebRTC-GAS</h1>
+    <p class="subtitle">WebRTCとGoogle Apps Scriptを使った P2P対戦ゲーム</p>
+
+    <div class="game-list">
+      <a href="sample/tictactoe.html" class="game-link tictactoe">
+        〇✕ゲーム
+        <div class="game-description">シンプルな三目並べ対戦</div>
+      </a>
+      <a href="sample/airhockey.html" class="game-link airhockey">
+        エアホッケー
+        <div class="game-description">リアルタイム対戦エアホッケー</div>
+      </a>
+    </div>
+
+    <div class="footer">
+      <a href="https://github.com/masaru0ta/webrtc_lib" target="_blank">GitHub Repository</a>
+    </div>
+  </div>
+</body>
+</html>
