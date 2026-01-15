@@ -450,6 +450,48 @@
     const PUCK_SPEED_LIMIT = 15;  // パックの最高速度
 
     // ========================================
+    // サウンド
+    // ========================================
+    let audioContext = null;
+
+    // AudioContextを初期化（ユーザー操作後に呼び出す）
+    function initAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    // BEEP音を鳴らす
+    function playBeep(frequency = 440, duration = 0.05, volume = 0.3) {
+      if (!audioContext) return;
+
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = frequency;
+      oscillator.type = 'square';
+
+      gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + duration);
+    }
+
+    // 壁衝突音（低め）
+    function playWallHit() {
+      playBeep(220, 0.05, 0.2);
+    }
+
+    // パドル衝突音（高め）
+    function playPaddleHit() {
+      playBeep(440, 0.08, 0.3);
+    }
+
+    // ========================================
     // ゲーム状態
     // ========================================
     let client = null;
@@ -744,9 +786,11 @@
       if (puck.x - PUCK_RADIUS <= 0) {
         puck.x = PUCK_RADIUS;
         puck.vx = -puck.vx * RESTITUTION;
+        playWallHit();
       } else if (puck.x + PUCK_RADIUS >= CANVAS_WIDTH) {
         puck.x = CANVAS_WIDTH - PUCK_RADIUS;
         puck.vx = -puck.vx * RESTITUTION;
+        playWallHit();
       }
 
       // ゴール判定（上下）
@@ -770,6 +814,7 @@
         } else {
           puck.y = PUCK_RADIUS;
           puck.vy = -puck.vy * RESTITUTION;
+          playWallHit();
         }
       }
 
@@ -790,6 +835,7 @@
         } else {
           puck.y = CANVAS_HEIGHT - PUCK_RADIUS;
           puck.vy = -puck.vy * RESTITUTION;
+          playWallHit();
         }
       }
 
@@ -929,6 +975,9 @@
           puck.vx = (puck.vx / newSpeed) * PUCK_SPEED_LIMIT;
           puck.vy = (puck.vy / newSpeed) * PUCK_SPEED_LIMIT;
         }
+
+        // パドル衝突音を鳴らす
+        playPaddleHit();
 
         // 衝突後すぐにパック状態を送信
         sendPuckState();
@@ -1255,6 +1304,9 @@
       // マッチング開始ボタン
       elements.btnStart.addEventListener('click', async () => {
         try {
+          // AudioContextを初期化（ユーザー操作をきっかけに）
+          initAudio();
+
           elements.btnStart.disabled = true;
           setStatus('IP取得中...');
 
