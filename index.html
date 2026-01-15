@@ -150,18 +150,13 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script>
     // 現在のページURLでQRコードを生成
-    QRCode.toCanvas(document.createElement('canvas'), window.location.href, {
+    new QRCode(document.getElementById('qrcode'), {
+      text: window.location.href,
       width: 150,
-      margin: 0
-    }, function(error, canvas) {
-      if (error) {
-        console.error(error);
-        return;
-      }
-      document.getElementById('qrcode').appendChild(canvas);
+      height: 150
     });
   </script>
 </body>
