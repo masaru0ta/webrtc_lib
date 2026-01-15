@@ -96,6 +96,30 @@
     .footer a:hover {
       text-decoration: underline;
     }
+
+    .qr-section {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+
+    .qr-title {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 15px;
+    }
+
+    #qrcode {
+      display: inline-block;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    #qrcode img {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -114,11 +138,31 @@
       </a>
     </div>
 
+    <div class="qr-section">
+      <p class="qr-title">このページをスマホで開く</p>
+      <div id="qrcode"></div>
+    </div>
+
     <div class="footer">
       <a href="https://github.com/masaru0ta/webrtc_lib" target="_blank">GitHub Repository</a>
       <span style="margin: 0 10px;">|</span>
       <a href="https://script.google.com/macros/s/AKfycbz9RbzxrYV8QbsclJcwNYhO4JoE9qQZlD-aWX5Z5U9jICPBEiBbEznf3scgQx8GONZa1A/exec" target="_blank">管理ページ</a>
     </div>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script>
+    // 現在のページURLでQRコードを生成
+    QRCode.toCanvas(document.createElement('canvas'), window.location.href, {
+      width: 150,
+      margin: 0
+    }, function(error, canvas) {
+      if (error) {
+        console.error(error);
+        return;
+      }
+      document.getElementById('qrcode').appendChild(canvas);
+    });
+  </script>
 </body>
 </html>
