@@ -529,17 +529,43 @@
         flashAlpha: 1.0
       };
 
-      // パーティクル生成
+      // パーティクル生成（花火のように放射状に広がる）
       const goalY = isMyGoal ? CANVAS_HEIGHT : 0;
-      for (let i = 0; i < 30; i++) {
+      const colors = isMyGoal ?
+        ['#e94560', '#ff6b8a', '#ff8fa3', '#ffb3c1'] :
+        ['#4CAF50', '#66BB6A', '#81C784', '#A5D6A7', '#FFD700', '#FFC107'];
+
+      for (let i = 0; i < 40; i++) {
+        // 放射状に広がる角度を計算
+        const angle = (Math.PI * 2 * i / 40) + (Math.random() - 0.5) * 0.3;
+        const speed = Math.random() * 8 + 4;
+
+        goalEffect.particles.push({
+          x: CANVAS_WIDTH / 2 + (Math.random() - 0.5) * 40,
+          y: goalY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed * (isMyGoal ? -1 : 1),  // 常にフィールド内側に向かう
+          size: Math.random() * 6 + 3,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alpha: 1.0,
+          gravity: isMyGoal ? 0.2 : -0.2  // 重力方向もフィールド内側に
+        });
+      }
+
+      // キラキラエフェクト追加
+      for (let i = 0; i < 20; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 5 + 2;
         goalEffect.particles.push({
           x: CANVAS_WIDTH / 2 + (Math.random() - 0.5) * GOAL_WIDTH,
           y: goalY,
-          vx: (Math.random() - 0.5) * 8,
-          vy: isMyGoal ? -Math.random() * 10 - 5 : Math.random() * 10 + 5,
-          size: Math.random() * 8 + 4,
-          color: isMyGoal ? '#e94560' : '#4CAF50',
-          alpha: 1.0
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed * (isMyGoal ? -1 : 1),
+          size: Math.random() * 3 + 1,
+          color: '#ffffff',
+          alpha: 1.0,
+          gravity: isMyGoal ? 0.1 : -0.1,
+          isSpark: true
         });
       }
     }
@@ -562,8 +588,14 @@
       goalEffect.particles.forEach(p => {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.3;  // 重力
+        p.vy += p.gravity || 0.3;  // 個別の重力（未設定なら0.3）
+        p.vx *= 0.98;  // 空気抵抗
+        p.vy *= 0.98;
         p.alpha = 1 - progress;
+        // スパークは早めにフェードアウト
+        if (p.isSpark) {
+          p.alpha = Math.max(0, 1 - progress * 1.5);
+        }
       });
 
       return true;
@@ -588,6 +620,14 @@
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
+
+        // スパークには光彩効果を追加
+        if (p.isSpark && p.alpha > 0.3) {
+          ctx.globalAlpha = p.alpha * 0.5;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       });
       ctx.globalAlpha = 1.0;
 
