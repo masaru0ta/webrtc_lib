@@ -52,9 +52,32 @@
       margin-bottom: 20px;
     }
 
+    .name-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
     .player-name {
       font-size: 20px;
       font-weight: bold;
+      color: #667eea;
+    }
+
+    .btn-edit-name {
+      background: none;
+      border: 1px solid #ccc;
+      color: #666;
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-edit-name:hover {
+      border-color: #667eea;
       color: #667eea;
     }
 
@@ -373,7 +396,10 @@
     <!-- 接続前画面 -->
     <div id="screen-lobby" class="screen active">
       <div class="player-info">
-        <div class="player-name" id="my-name">-</div>
+        <div class="name-row">
+          <span class="player-name" id="my-name">-</span>
+          <button class="btn-edit-name" id="btn-edit-name">編集</button>
+        </div>
         <div class="player-id" id="my-id">ID: -</div>
       </div>
 
@@ -475,6 +501,7 @@
       screenGame: document.getElementById('screen-game'),
       myName: document.getElementById('my-name'),
       myId: document.getElementById('my-id'),
+      btnEditName: document.getElementById('btn-edit-name'),
       btnStart: document.getElementById('btn-start'),
       status: document.getElementById('status'),
       opponentName: document.getElementById('opponent-name'),
@@ -756,6 +783,17 @@
       // UI更新
       elements.myName.textContent = myName;
       elements.myId.textContent = stored.myId ? `ID: ${stored.myId}` : 'ID: 未登録';
+
+      // 名前編集ボタン
+      elements.btnEditName.addEventListener('click', () => {
+        const currentName = elements.myName.textContent;
+        const newName = prompt('新しい名前を入力してください:', currentName);
+        if (newName && newName.trim()) {
+          const trimmedName = newName.trim();
+          saveToStorage(STORAGE_KEYS.MY_NAME, trimmedName);
+          elements.myName.textContent = trimmedName;
+        }
+      });
 
       // 設定UIの初期化
       elements.inputPassphrase.value = stored.passphrase;
