@@ -888,7 +888,8 @@
       myPaddlePrevY = myPaddleY;
       opponentPaddleX = CANVAS_WIDTH / 2;
       // 相手パドルの初期Y位置はホスト座標系で設定（描画時にゲストは反転する）
-      opponentPaddleY = CANVAS_HEIGHT * 3 / 4;  // ホスト座標系での相手の位置
+      // ホスト座標系では相手は上半分(1/4)にいる
+      opponentPaddleY = CANVAS_HEIGHT / 4;
       opponentPaddlePrevX = opponentPaddleX;
       opponentPaddlePrevY = opponentPaddleY;
 
