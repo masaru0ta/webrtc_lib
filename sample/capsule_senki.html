@@ -78,13 +78,100 @@
             image-rendering: pixelated;
         }
 
-        .status-bar {
+        .info-panel {
             margin-top: 10px;
             padding: 10px 20px;
             background: #16213e;
             border-radius: 8px;
-            min-width: 300px;
+            min-width: 400px;
             text-align: center;
+        }
+
+        #command-buttons {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .cmd-btn {
+            padding: 6px 16px;
+            font-size: 12px;
+            background: #0f3460;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .cmd-btn:hover {
+            background: #1a4a7a;
+        }
+
+        .cmd-btn:disabled {
+            background: #333;
+            cursor: not-allowed;
+        }
+
+        /* モーダル */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            min-width: 280px;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .production-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 8px;
+            background: #0f3460;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .production-item:hover {
+            background: #1a4a7a;
+        }
+
+        .production-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #cancel-production {
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
         }
     </style>
 </head>
@@ -93,7 +180,8 @@
 
     <div class="info-bar">
         <span>ターン: <span id="turn-count">1</span></span>
-        <span id="current-player" class="turn-blue">青軍のターン</span>
+        <span id="current-player" class="turn-blue">青軍</span>
+        <span>CP: <span id="cp-display">1000</span></span>
         <button id="end-turn-btn">ターン終了</button>
     </div>
 
@@ -101,8 +189,18 @@
         <canvas id="map-canvas"></canvas>
     </div>
 
-    <div class="status-bar">
-        <span id="status-text">ユニットを選択してください</span>
+    <div class="info-panel">
+        <div id="status-text">ユニットを選択してください</div>
+        <div id="command-buttons"></div>
+    </div>
+
+    <!-- 生産メニューモーダル -->
+    <div id="production-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>ユニット生産</h3>
+            <div id="production-list"></div>
+            <button id="cancel-production">キャンセル</button>
+        </div>
     </div>
 
     <script>
@@ -146,6 +244,13 @@
             [TERRAIN.GB]: 1
         };
 
+        // 生産可能ユニット
+        const UNIT_TYPES = {
+            ZAKU: { name: 'ZAKU', cp: 100, turns: 1, mv: 4 },
+            GOUF: { name: 'GOUF', cp: 200, turns: 1, mv: 4 },
+            DOM: { name: 'DOM', cp: 500, turns: 1, mv: 4 }
+        };
+
         // ========================================
         // マップデータ（map01再現）
         // 0=宇宙, 1=平野, 2=森林, 3=砂漠, 4=都市, 5=GP, 6=GB
@@ -184,13 +289,16 @@
             currentPlayer: 'blue',
             turnCount: 1,
             selectedUnit: null,
+            selectedFacility: null,
             moveRange: [],
-            movePaths: new Map(),  // 各マスへの経路を保存
+            movePaths: new Map(),
             animationTime: 0,
-            movingUnit: null,      // 移動アニメーション中のユニット
-            movePath: [],          // 移動経路
-            moveIndex: 0,          // 現在の経路インデックス
-            lastMoveTime: 0        // 最後に移動した時刻
+            movingUnit: null,
+            movePath: [],
+            moveIndex: 0,
+            lastMoveTime: 0,
+            cp: { blue: 1000, red: 1000 },
+            productionQueue: []  // { facilityId, unitType, turnsLeft, team }
         };
 
         // ユニットリスト
@@ -207,6 +315,23 @@
             { id: 8, type: 'ZAKU', team: 'red', x: 17, y: 6, mv: 4, moved: false },
             { id: 9, type: 'ZAKU', team: 'red', x: 16, y: 7, mv: 4, moved: false },
             { id: 10, type: 'ZAKU', team: 'red', x: 16, y: 18, mv: 4, moved: false }
+        ];
+
+        let nextUnitId = 11;
+
+        // 施設リスト
+        let facilities = [
+            // GP（青軍基地）- 青軍固定
+            { id: 1, x: 6, y: 5, type: 'GP', owner: 'blue' },
+            { id: 2, x: 6, y: 18, type: 'GP', owner: 'blue' },
+            // GB（赤軍基地）- 赤軍初期所有
+            { id: 3, x: 16, y: 5, type: 'GB', owner: 'red' },
+            { id: 4, x: 16, y: 18, type: 'GB', owner: 'red' },
+            // 都市 - 中立
+            { id: 5, x: 9, y: 6, type: 'CITY', owner: 'neutral' },
+            { id: 6, x: 13, y: 6, type: 'CITY', owner: 'neutral' },
+            { id: 7, x: 9, y: 17, type: 'CITY', owner: 'neutral' },
+            { id: 8, x: 13, y: 17, type: 'CITY', owner: 'neutral' }
         ];
 
         // ========================================
@@ -277,9 +402,29 @@
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawMap();
+            drawFacilityOwners();
             drawMoveRange();
             drawUnits();
             drawSelection();
+        }
+
+        function drawFacilityOwners() {
+            for (const facility of facilities) {
+                if (facility.owner === 'neutral') continue;
+
+                const x = facility.x * TILE_SIZE;
+                const y = facility.y * TILE_SIZE;
+                const color = facility.owner === 'blue' ? 'rgba(33, 150, 243, 0.5)' : 'rgba(244, 67, 54, 0.5)';
+
+                ctx.fillStyle = color;
+                ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+                // 枠線
+                ctx.strokeStyle = facility.owner === 'blue' ? '#64b5f6' : '#ef5350';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                ctx.lineWidth = 1;
+            }
         }
 
         function drawMap() {
@@ -503,23 +648,49 @@
 
             if (clickedUnit && clickedUnit.team === gameState.currentPlayer && !clickedUnit.moved) {
                 selectUnit(clickedUnit);
-            } else {
-                deselectUnit();
+                return;
             }
+
+            // 施設選択を試みる
+            const clickedFacility = facilities.find(f => f.x === x && f.y === y);
+            if (clickedFacility) {
+                selectFacility(clickedFacility);
+                return;
+            }
+
+            deselectAll();
         }
 
         function selectUnit(unit) {
             gameState.selectedUnit = unit;
+            gameState.selectedFacility = null;
             gameState.moveRange = calculateMoveRange(unit);
             updateStatus(`${unit.type} を選択中 (移動力: ${unit.mv})`);
+            updateCommandButtons();
+            render();
+        }
+
+        function selectFacility(facility) {
+            gameState.selectedUnit = null;
+            gameState.selectedFacility = facility;
+            gameState.moveRange = [];
+            const ownerText = facility.owner === 'neutral' ? '中立' : (facility.owner === 'blue' ? '青軍' : '赤軍');
+            updateStatus(`${facility.type} (${ownerText}所有)`);
+            updateCommandButtons();
+            render();
+        }
+
+        function deselectAll() {
+            gameState.selectedUnit = null;
+            gameState.selectedFacility = null;
+            gameState.moveRange = [];
+            updateStatus('ユニットを選択してください');
+            updateCommandButtons();
             render();
         }
 
         function deselectUnit() {
-            gameState.selectedUnit = null;
-            gameState.moveRange = [];
-            updateStatus('ユニットを選択してください');
-            render();
+            deselectAll();
         }
 
         function startMoveAnimation(unit, x, y) {
@@ -578,6 +749,11 @@
         document.getElementById('end-turn-btn').addEventListener('click', endTurn);
 
         function endTurn() {
+            const nextPlayer = gameState.currentPlayer === 'blue' ? 'red' : 'blue';
+
+            // ターン開始処理（次のプレイヤー）
+            processTurnStart(nextPlayer);
+
             // プレイヤー切り替え
             if (gameState.currentPlayer === 'blue') {
                 gameState.currentPlayer = 'red';
@@ -592,20 +768,60 @@
             }
 
             // 選択解除
-            deselectUnit();
+            deselectAll();
 
             // UI更新
             updateTurnDisplay();
         }
 
+        function processTurnStart(player) {
+            // CP収入
+            const baseIncome = 100;
+            const cityBonus = facilities.filter(f => f.type === 'CITY' && f.owner === player).length * 100;
+            gameState.cp[player] += baseIncome + cityBonus;
+
+            // 生産キュー処理
+            const completed = [];
+            for (const item of gameState.productionQueue) {
+                if (item.team === player) {
+                    item.turnsLeft--;
+                    if (item.turnsLeft <= 0) {
+                        completed.push(item);
+                    }
+                }
+            }
+
+            // 完成ユニットを配置
+            for (const item of completed) {
+                const facility = facilities.find(f => f.id === item.facilityId);
+                if (facility) {
+                    const unitOnFacility = units.find(u => u.x === facility.x && u.y === facility.y);
+                    if (!unitOnFacility) {
+                        const unitDef = UNIT_TYPES[item.unitType];
+                        units.push({
+                            id: nextUnitId++,
+                            type: item.unitType,
+                            team: item.team,
+                            x: facility.x,
+                            y: facility.y,
+                            mv: unitDef.mv,
+                            moved: true
+                        });
+                    }
+                }
+                gameState.productionQueue = gameState.productionQueue.filter(q => q !== item);
+            }
+        }
+
         function updateTurnDisplay() {
             document.getElementById('turn-count').textContent = gameState.turnCount;
+            document.getElementById('cp-display').textContent = gameState.cp[gameState.currentPlayer];
             const playerEl = document.getElementById('current-player');
             if (gameState.currentPlayer === 'blue') {
-                playerEl.textContent = '青軍のターン';
+                playerEl.textContent = '青軍';
                 playerEl.className = 'turn-blue';
             } else {
-                playerEl.textContent = '赤軍のターン';
+                playerEl.textContent = '赤軍';
                 playerEl.className = 'turn-red';
             }
         }
@@ -613,6 +829,101 @@
         function updateStatus(text) {
             document.getElementById('status-text').textContent = text;
         }
+
+        // ========================================
+        // コマンドボタン
+        // ========================================
+        function updateCommandButtons() {
+            const container = document.getElementById('command-buttons');
+            container.innerHTML = '';
+
+            const unit = gameState.selectedUnit;
+            const facility = gameState.selectedFacility;
+            const player = gameState.currentPlayer;
+
+            // ユニットが施設上にいて、占領可能な場合
+            if (unit && !unit.moved) {
+                const facilityAtUnit = facilities.find(f => f.x === unit.x && f.y === unit.y);
+                if (facilityAtUnit && facilityAtUnit.owner !== player && facilityAtUnit.type !== 'GP') {
+                    const btn = document.createElement('button');
+                    btn.className = 'cmd-btn';
+                    btn.textContent = '占領';
+                    btn.onclick = () => captureFeature(unit, facilityAtUnit);
+                    container.appendChild(btn);
+                }
+            }
+
+            // 施設が自軍の生産拠点の場合
+            if (facility && facility.owner === player && (facility.type === 'GP' || facility.type === 'GB')) {
+                const unitOnFacility = units.find(u => u.x === facility.x && u.y === facility.y);
+                const producing = gameState.productionQueue.find(q => q.facilityId === facility.id);
+                if (!unitOnFacility && !producing) {
+                    const btn = document.createElement('button');
+                    btn.className = 'cmd-btn';
+                    btn.textContent = '生産';
+                    btn.onclick = () => openProductionMenu(facility);
+                    container.appendChild(btn);
+                }
+            }
+        }
+
+        // ========================================
+        // 占領システム
+        // ========================================
+        function captureFeature(unit, facility) {
+            facility.owner = unit.team;
+            unit.moved = true;
+            updateStatus(`${facility.type} を占領しました！`);
+            deselectAll();
+        }
+
+        // ========================================
+        // 生産システム
+        // ========================================
+        function openProductionMenu(facility) {
+            const modal = document.getElementById('production-modal');
+            const list = document.getElementById('production-list');
+            list.innerHTML = '';
+
+            const player = gameState.currentPlayer;
+            const cp = gameState.cp[player];
+
+            for (const [key, def] of Object.entries(UNIT_TYPES)) {
+                const item = document.createElement('div');
+                item.className = 'production-item' + (cp < def.cp ? ' disabled' : '');
+                item.innerHTML = `<span>${def.name}</span><span>${def.cp}CP</span>`;
+                if (cp >= def.cp) {
+                    item.onclick = () => produceUnit(facility, key);
+                }
+                list.appendChild(item);
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function produceUnit(facility, unitType) {
+            const def = UNIT_TYPES[unitType];
+            const player = gameState.currentPlayer;
+
+            if (gameState.cp[player] < def.cp) return;
+
+            gameState.cp[player] -= def.cp;
+            gameState.productionQueue.push({
+                facilityId: facility.id,
+                unitType: unitType,
+                turnsLeft: def.turns,
+                team: player
+            });
+
+            document.getElementById('production-modal').classList.add('hidden');
+            updateTurnDisplay();
+            updateStatus(`${def.name} の生産を開始しました（次ターン完成）`);
+            deselectAll();
+        }
+
+        document.getElementById('cancel-production').onclick = () => {
+            document.getElementById('production-modal').classList.add('hidden');
+        };
 
         // ========================================
         // アニメーションループ
