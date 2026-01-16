@@ -316,7 +316,30 @@
                 const img = images.units[imgKey];
 
                 // ユニットごとにアニメーションのオフセットをずらす（IDベース）
-                const animOffset = Math.sin(gameState.animationTime * 0.003 + unit.id * 0.5) * 3;
+                const animPhase = gameState.animationTime * 0.003 + unit.id * 0.5;
+                const animOffset = Math.sin(animPhase) * 3;
+
+                // 色アニメーション（グロー効果）
+                const glowIntensity = (Math.sin(animPhase * 1.5) + 1) / 2; // 0〜1
+                const glowAlpha = 0.3 + glowIntensity * 0.4;
+                const glowSize = 4 + glowIntensity * 4;
+
+                const centerX = unit.x * TILE_SIZE + TILE_SIZE / 2;
+                const centerY = unit.y * TILE_SIZE + TILE_SIZE / 2 + animOffset;
+
+                // グロー描画
+                const glowColor = unit.team === 'blue'
+                    ? `rgba(100, 181, 246, ${glowAlpha})`
+                    : `rgba(239, 83, 80, ${glowAlpha})`;
+
+                ctx.save();
+                ctx.shadowColor = unit.team === 'blue' ? '#64b5f6' : '#ef5350';
+                ctx.shadowBlur = glowSize;
+                ctx.fillStyle = glowColor;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, TILE_SIZE / 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
 
                 if (img) {
                     // 画像の中心をタイルに合わせる（2倍サイズ: 48x64）
@@ -329,13 +352,7 @@
                     // フォールバック: 円で描画
                     ctx.fillStyle = unit.team === 'blue' ? '#2196f3' : '#f44336';
                     ctx.beginPath();
-                    ctx.arc(
-                        unit.x * TILE_SIZE + TILE_SIZE / 2,
-                        unit.y * TILE_SIZE + TILE_SIZE / 2 + animOffset,
-                        TILE_SIZE / 3,
-                        0,
-                        Math.PI * 2
-                    );
+                    ctx.arc(centerX, centerY, TILE_SIZE / 3, 0, Math.PI * 2);
                     ctx.fill();
                 }
 
