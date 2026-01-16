@@ -304,10 +304,24 @@
         }
 
         function drawMoveRange() {
-            ctx.fillStyle = 'rgba(100, 181, 246, 0.4)';
+            // アニメーションで脈動
+            const pulse = (Math.sin(gameState.animationTime * 0.005) + 1) / 2;
+            const alpha = 0.25 + pulse * 0.25;
+
             for (const pos of gameState.moveRange) {
-                ctx.fillRect(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                const x = pos.x * TILE_SIZE;
+                const y = pos.y * TILE_SIZE;
+
+                // 塗りつぶし
+                ctx.fillStyle = `rgba(100, 220, 255, ${alpha})`;
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                // 枠線
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + pulse * 0.5})`;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
             }
+            ctx.lineWidth = 1;
         }
 
         function drawUnits() {
