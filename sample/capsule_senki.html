@@ -182,7 +182,8 @@
             currentPlayer: 'blue',
             turnCount: 1,
             selectedUnit: null,
-            moveRange: []
+            moveRange: [],
+            animationTime: 0
         };
 
         // ユニットリスト
@@ -314,12 +315,15 @@
                 const imgKey = `${unit.type}_${unit.team}`;
                 const img = images.units[imgKey];
 
+                // ユニットごとにアニメーションのオフセットをずらす（IDベース）
+                const animOffset = Math.sin(gameState.animationTime * 0.003 + unit.id * 0.5) * 3;
+
                 if (img) {
                     // 画像の中心をタイルに合わせる（2倍サイズ: 48x64）
                     const unitWidth = 48;
                     const unitHeight = 64;
                     const drawX = unit.x * TILE_SIZE + (TILE_SIZE - unitWidth) / 2;
-                    const drawY = unit.y * TILE_SIZE + (TILE_SIZE - unitHeight) / 2;
+                    const drawY = unit.y * TILE_SIZE + (TILE_SIZE - unitHeight) / 2 + animOffset;
                     ctx.drawImage(img, drawX, drawY - 8, unitWidth, unitHeight);
                 } else {
                     // フォールバック: 円で描画
@@ -327,7 +331,7 @@
                     ctx.beginPath();
                     ctx.arc(
                         unit.x * TILE_SIZE + TILE_SIZE / 2,
-                        unit.y * TILE_SIZE + TILE_SIZE / 2,
+                        unit.y * TILE_SIZE + TILE_SIZE / 2 + animOffset,
                         TILE_SIZE / 3,
                         0,
                         Math.PI * 2
@@ -510,13 +514,22 @@
         }
 
         // ========================================
+        // アニメーションループ
+        // ========================================
+        function animate(timestamp) {
+            gameState.animationTime = timestamp;
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        // ========================================
         // 初期化
         // ========================================
         async function init() {
             updateStatus('読み込み中...');
             await loadImages();
-            render();
             updateStatus('ユニットを選択してください');
+            requestAnimationFrame(animate);
         }
 
         init();
