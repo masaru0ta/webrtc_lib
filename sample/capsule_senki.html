@@ -546,7 +546,7 @@
         function updateMoveAnimation() {
             if (!gameState.movingUnit) return;
 
-            const MOVE_INTERVAL = 120;  // 1マス移動にかかる時間（ミリ秒）
+            const MOVE_INTERVAL = 60;  // 1マス移動にかかる時間（ミリ秒）
 
             if (gameState.animationTime - gameState.lastMoveTime >= MOVE_INTERVAL) {
                 const unit = gameState.movingUnit;
