@@ -66,10 +66,14 @@
         #game-container {
             position: relative;
             border: 2px solid #333;
+            max-width: 90vw;
+            max-height: 70vh;
+            overflow: auto;
         }
 
         #map-canvas {
             display: block;
+            image-rendering: pixelated;
         }
 
         .status-bar {
@@ -103,7 +107,7 @@
         // ========================================
         // 定数定義
         // ========================================
-        const TILE_SIZE = 16;
+        const TILE_SIZE = 32;
         const MAP_WIDTH = 24;
         const MAP_HEIGHT = 24;
 
@@ -311,10 +315,12 @@
                 const img = images.units[imgKey];
 
                 if (img) {
-                    // 画像の中心をタイルに合わせる
-                    const drawX = unit.x * TILE_SIZE + (TILE_SIZE - 24) / 2;
-                    const drawY = unit.y * TILE_SIZE + (TILE_SIZE - 32) / 2;
-                    ctx.drawImage(img, drawX, drawY - 4, 24, 32);
+                    // 画像の中心をタイルに合わせる（2倍サイズ: 48x64）
+                    const unitWidth = 48;
+                    const unitHeight = 64;
+                    const drawX = unit.x * TILE_SIZE + (TILE_SIZE - unitWidth) / 2;
+                    const drawY = unit.y * TILE_SIZE + (TILE_SIZE - unitHeight) / 2;
+                    ctx.drawImage(img, drawX, drawY - 8, unitWidth, unitHeight);
                 } else {
                     // フォールバック: 円で描画
                     ctx.fillStyle = unit.team === 'blue' ? '#2196f3' : '#f44336';
