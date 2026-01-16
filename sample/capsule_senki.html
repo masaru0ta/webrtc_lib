@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カプセル戦記 - 戦略パート</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .info-bar {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px 20px;
+            background: #16213e;
+            border-radius: 8px;
+        }
+
+        .info-bar span {
+            font-size: 16px;
+        }
+
+        .turn-blue {
+            color: #4fc3f7;
+        }
+
+        .turn-red {
+            color: #ef5350;
+        }
+
+        #end-turn-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            background: #0f3460;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #end-turn-btn:hover {
+            background: #1a4a7a;
+        }
+
+        #game-container {
+            position: relative;
+            border: 2px solid #333;
+        }
+
+        #map-canvas {
+            display: block;
+        }
+
+        .status-bar {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #16213e;
+            border-radius: 8px;
+            min-width: 300px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>カプセル戦記 - 戦略パート</h1>
+
+    <div class="info-bar">
+        <span>ターン: <span id="turn-count">1</span></span>
+        <span id="current-player" class="turn-blue">青軍のターン</span>
+        <button id="end-turn-btn">ターン終了</button>
+    </div>
+
+    <div id="game-container">
+        <canvas id="map-canvas"></canvas>
+    </div>
+
+    <div class="status-bar">
+        <span id="status-text">ユニットを選択してください</span>
+    </div>
+
+    <script>
+        // ========================================
+        // 定数定義
+        // ========================================
+        const TILE_SIZE = 16;
+        const MAP_WIDTH = 24;
+        const MAP_HEIGHT = 24;
+
+        // 地形タイプ
+        const TERRAIN = {
+            SPACE: 0,
+            PLAIN: 1,
+            FOREST: 2,
+            DESERT: 3,
+            CITY: 4,
+            GP: 5,
+            GB: 6
+        };
+
+        // 地形画像パス
+        const TERRAIN_IMAGES = {
+            [TERRAIN.SPACE]: '../assets/gashapon/terrain/space.gif',
+            [TERRAIN.PLAIN]: '../assets/gashapon/terrain/plainicon.gif',
+            [TERRAIN.FOREST]: '../assets/gashapon/terrain/foresticon.gif',
+            [TERRAIN.DESERT]: '../assets/gashapon/terrain/deserticon.gif',
+            [TERRAIN.CITY]: '../assets/gashapon/terrain/cityicon.gif',
+            [TERRAIN.GP]: '../assets/gashapon/terrain/brgpicon.gif',
+            [TERRAIN.GB]: '../assets/gashapon/terrain/redgb.gif'
+        };
+
+        // 移動コスト
+        const MOVE_COST = {
+            [TERRAIN.SPACE]: 1,
+            [TERRAIN.PLAIN]: 1,
+            [TERRAIN.FOREST]: 2,
+            [TERRAIN.DESERT]: 3,
+            [TERRAIN.CITY]: 1,
+            [TERRAIN.GP]: 1,
+            [TERRAIN.GB]: 1
+        };
+
+        // ========================================
+        // マップデータ（map01再現）
+        // 0=宇宙, 1=平野, 2=森林, 3=砂漠, 4=都市, 5=GP, 6=GB
+        // ========================================
+        const MAP_DATA = [
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0],
+            [0,0,0,0,0,1,1,2,1,1,0,0,0,1,1,2,1,1,0,0,0,0,0,0],
+            [0,0,0,0,1,1,5,1,2,1,1,0,1,1,2,1,6,1,1,0,0,0,0,0],
+            [0,0,0,0,1,2,1,1,1,4,1,1,1,4,1,1,1,2,1,0,0,0,0,0],
+            [0,0,0,1,1,1,2,1,1,1,1,0,1,1,1,1,2,1,1,1,0,0,0,0],
+            [0,0,0,1,2,1,1,1,1,1,0,0,0,1,1,1,1,1,2,1,0,0,0,0],
+            [0,0,0,0,1,1,1,3,3,0,0,0,0,0,3,3,1,1,1,0,0,0,0,0],
+            [0,0,0,0,1,1,3,3,3,0,0,0,0,0,3,3,3,1,1,0,0,0,0,0],
+            [0,0,0,0,0,1,3,3,0,0,0,0,0,0,0,3,3,1,0,0,0,0,0,0],
+            [0,0,0,0,0,1,3,3,0,0,0,0,0,0,0,3,3,1,0,0,0,0,0,0],
+            [0,0,0,0,1,1,3,3,3,0,0,0,0,0,3,3,3,1,1,0,0,0,0,0],
+            [0,0,0,0,1,1,1,3,3,0,0,0,0,0,3,3,1,1,1,0,0,0,0,0],
+            [0,0,0,1,2,1,1,1,1,1,0,0,0,1,1,1,1,1,2,1,0,0,0,0],
+            [0,0,0,1,1,1,2,1,1,1,1,0,1,1,1,1,2,1,1,1,0,0,0,0],
+            [0,0,0,0,1,2,1,1,1,4,1,1,1,4,1,1,1,2,1,0,0,0,0,0],
+            [0,0,0,0,1,1,5,1,2,1,1,0,1,1,2,1,6,1,1,0,0,0,0,0],
+            [0,0,0,0,0,1,1,2,1,1,0,0,0,1,1,2,1,1,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        ];
+
+        // ========================================
+        // ゲーム状態
+        // ========================================
+        let gameState = {
+            currentPlayer: 'blue',
+            turnCount: 1,
+            selectedUnit: null,
+            moveRange: []
+        };
+
+        // ユニットリスト
+        let units = [
+            // 青軍（左側GP周辺）
+            { id: 1, type: 'ZAKU', team: 'blue', x: 6, y: 5, mv: 4, moved: false },
+            { id: 2, type: 'ZAKU', team: 'blue', x: 5, y: 6, mv: 4, moved: false },
+            { id: 3, type: 'ZAKU', team: 'blue', x: 7, y: 6, mv: 4, moved: false },
+            { id: 4, type: 'ZAKU', team: 'blue', x: 6, y: 7, mv: 4, moved: false },
+            { id: 5, type: 'ZAKU', team: 'blue', x: 6, y: 18, mv: 4, moved: false },
+            // 赤軍（右側GB周辺）
+            { id: 6, type: 'ZAKU', team: 'red', x: 16, y: 5, mv: 4, moved: false },
+            { id: 7, type: 'ZAKU', team: 'red', x: 15, y: 6, mv: 4, moved: false },
+            { id: 8, type: 'ZAKU', team: 'red', x: 17, y: 6, mv: 4, moved: false },
+            { id: 9, type: 'ZAKU', team: 'red', x: 16, y: 7, mv: 4, moved: false },
+            { id: 10, type: 'ZAKU', team: 'red', x: 16, y: 18, mv: 4, moved: false }
+        ];
+
+        // ========================================
+        // 画像リソース
+        // ========================================
+        const images = {
+            terrain: {},
+            units: {}
+        };
+
+        // ========================================
+        // キャンバス設定
+        // ========================================
+        const canvas = document.getElementById('map-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = MAP_WIDTH * TILE_SIZE;
+        canvas.height = MAP_HEIGHT * TILE_SIZE;
+
+        // ========================================
+        // 画像読み込み
+        // ========================================
+        async function loadImages() {
+            const promises = [];
+
+            // 地形画像
+            for (const [type, path] of Object.entries(TERRAIN_IMAGES)) {
+                promises.push(new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        images.terrain[type] = img;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        console.warn(`Failed to load: ${path}`);
+                        resolve();
+                    };
+                    img.src = path;
+                }));
+            }
+
+            // ユニット画像
+            const unitPaths = {
+                'ZAKU_blue': '../assets/gashapon/zakubbtlf.gif',
+                'ZAKU_red': '../assets/gashapon/zakurbtlf.gif'
+            };
+
+            for (const [key, path] of Object.entries(unitPaths)) {
+                promises.push(new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        images.units[key] = img;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        console.warn(`Failed to load: ${path}`);
+                        resolve();
+                    };
+                    img.src = path;
+                }));
+            }
+
+            await Promise.all(promises);
+        }
+
+        // ========================================
+        // 描画関数
+        // ========================================
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMap();
+            drawMoveRange();
+            drawUnits();
+            drawSelection();
+        }
+
+        function drawMap() {
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    const terrain = MAP_DATA[y][x];
+                    const img = images.terrain[terrain];
+                    if (img) {
+                        ctx.drawImage(img, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    } else {
+                        // フォールバック: 色で描画
+                        const colors = {
+                            [TERRAIN.SPACE]: '#1a1a4e',
+                            [TERRAIN.PLAIN]: '#4caf50',
+                            [TERRAIN.FOREST]: '#2e7d32',
+                            [TERRAIN.DESERT]: '#ffc107',
+                            [TERRAIN.CITY]: '#9e9e9e',
+                            [TERRAIN.GP]: '#2196f3',
+                            [TERRAIN.GB]: '#f44336'
+                        };
+                        ctx.fillStyle = colors[terrain] || '#000';
+                        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+                    // グリッド線
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+
+        function drawMoveRange() {
+            ctx.fillStyle = 'rgba(100, 181, 246, 0.4)';
+            for (const pos of gameState.moveRange) {
+                ctx.fillRect(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+        }
+
+        function drawUnits() {
+            for (const unit of units) {
+                const imgKey = `${unit.type}_${unit.team}`;
+                const img = images.units[imgKey];
+
+                if (img) {
+                    // 画像の中心をタイルに合わせる
+                    const drawX = unit.x * TILE_SIZE + (TILE_SIZE - 24) / 2;
+                    const drawY = unit.y * TILE_SIZE + (TILE_SIZE - 32) / 2;
+                    ctx.drawImage(img, drawX, drawY - 4, 24, 32);
+                } else {
+                    // フォールバック: 円で描画
+                    ctx.fillStyle = unit.team === 'blue' ? '#2196f3' : '#f44336';
+                    ctx.beginPath();
+                    ctx.arc(
+                        unit.x * TILE_SIZE + TILE_SIZE / 2,
+                        unit.y * TILE_SIZE + TILE_SIZE / 2,
+                        TILE_SIZE / 3,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+
+                // 移動済みマーク
+                if (unit.moved) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(unit.x * TILE_SIZE, unit.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+
+        function drawSelection() {
+            if (gameState.selectedUnit) {
+                const unit = gameState.selectedUnit;
+                ctx.strokeStyle = '#ffeb3b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(
+                    unit.x * TILE_SIZE + 1,
+                    unit.y * TILE_SIZE + 1,
+                    TILE_SIZE - 2,
+                    TILE_SIZE - 2
+                );
+                ctx.lineWidth = 1;
+            }
+        }
+
+        // ========================================
+        // 移動範囲計算（幅優先探索）
+        // ========================================
+        function calculateMoveRange(unit) {
+            const range = [];
+            const visited = new Map();
+            const queue = [{ x: unit.x, y: unit.y, cost: 0 }];
+            visited.set(`${unit.x},${unit.y}`, 0);
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+
+                // 隣接4方向
+                const directions = [
+                    { dx: 0, dy: -1 },
+                    { dx: 0, dy: 1 },
+                    { dx: -1, dy: 0 },
+                    { dx: 1, dy: 0 }
+                ];
+
+                for (const dir of directions) {
+                    const nx = current.x + dir.dx;
+                    const ny = current.y + dir.dy;
+
+                    // マップ範囲外チェック
+                    if (nx < 0 || nx >= MAP_WIDTH || ny < 0 || ny >= MAP_HEIGHT) continue;
+
+                    const terrain = MAP_DATA[ny][nx];
+                    const moveCost = MOVE_COST[terrain];
+
+                    // 進入不可チェック
+                    if (moveCost === undefined) continue;
+
+                    const totalCost = current.cost + moveCost;
+
+                    // 移動力オーバーチェック
+                    if (totalCost > unit.mv) continue;
+
+                    const key = `${nx},${ny}`;
+
+                    // 既に低コストで訪問済みならスキップ
+                    if (visited.has(key) && visited.get(key) <= totalCost) continue;
+
+                    // 他ユニットがいるマスはスキップ（通過不可）
+                    const unitAtPos = units.find(u => u.x === nx && u.y === ny);
+                    if (unitAtPos) continue;
+
+                    visited.set(key, totalCost);
+                    queue.push({ x: nx, y: ny, cost: totalCost });
+                    range.push({ x: nx, y: ny });
+                }
+            }
+
+            return range;
+        }
+
+        // ========================================
+        // イベントハンドラ
+        // ========================================
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+
+            handleClick(x, y);
+        });
+
+        function handleClick(x, y) {
+            // 選択中のユニットがあれば移動を試みる
+            if (gameState.selectedUnit) {
+                const inRange = gameState.moveRange.some(pos => pos.x === x && pos.y === y);
+                if (inRange) {
+                    moveUnit(gameState.selectedUnit, x, y);
+                    return;
+                }
+            }
+
+            // ユニット選択を試みる
+            const clickedUnit = units.find(u => u.x === x && u.y === y);
+
+            if (clickedUnit && clickedUnit.team === gameState.currentPlayer && !clickedUnit.moved) {
+                selectUnit(clickedUnit);
+            } else {
+                deselectUnit();
+            }
+        }
+
+        function selectUnit(unit) {
+            gameState.selectedUnit = unit;
+            gameState.moveRange = calculateMoveRange(unit);
+            updateStatus(`${unit.type} を選択中 (移動力: ${unit.mv})`);
+            render();
+        }
+
+        function deselectUnit() {
+            gameState.selectedUnit = null;
+            gameState.moveRange = [];
+            updateStatus('ユニットを選択してください');
+            render();
+        }
+
+        function moveUnit(unit, x, y) {
+            unit.x = x;
+            unit.y = y;
+            unit.moved = true;
+            deselectUnit();
+            updateStatus(`${unit.type} が移動しました`);
+        }
+
+        // ========================================
+        // ターン制御
+        // ========================================
+        document.getElementById('end-turn-btn').addEventListener('click', endTurn);
+
+        function endTurn() {
+            // プレイヤー切り替え
+            if (gameState.currentPlayer === 'blue') {
+                gameState.currentPlayer = 'red';
+            } else {
+                gameState.currentPlayer = 'blue';
+                gameState.turnCount++;
+            }
+
+            // 全ユニットの移動フラグリセット
+            for (const unit of units) {
+                unit.moved = false;
+            }
+
+            // 選択解除
+            deselectUnit();
+
+            // UI更新
+            updateTurnDisplay();
+        }
+
+        function updateTurnDisplay() {
+            document.getElementById('turn-count').textContent = gameState.turnCount;
+            const playerEl = document.getElementById('current-player');
+            if (gameState.currentPlayer === 'blue') {
+                playerEl.textContent = '青軍のターン';
+                playerEl.className = 'turn-blue';
+            } else {
+                playerEl.textContent = '赤軍のターン';
+                playerEl.className = 'turn-red';
+            }
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status-text').textContent = text;
+        }
+
+        // ========================================
+        // 初期化
+        // ========================================
+        async function init() {
+            updateStatus('読み込み中...');
+            await loadImages();
+            render();
+            updateStatus('ユニットを選択してください');
+        }
+
+        init();
+    </script>
+</body>
+</html>
