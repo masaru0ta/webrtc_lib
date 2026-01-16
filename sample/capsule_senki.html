@@ -183,7 +183,12 @@
             turnCount: 1,
             selectedUnit: null,
             moveRange: [],
-            animationTime: 0
+            movePaths: new Map(),  // 各マスへの経路を保存
+            animationTime: 0,
+            movingUnit: null,      // 移動アニメーション中のユニット
+            movePath: [],          // 移動経路
+            moveIndex: 0,          // 現在の経路インデックス
+            lastMoveTime: 0        // 最後に移動した時刻
         };
 
         // ユニットリスト
@@ -394,16 +399,20 @@
         }
 
         // ========================================
-        // 移動範囲計算（幅優先探索）
+        // 移動範囲計算（幅優先探索）+ 経路記録
         // ========================================
         function calculateMoveRange(unit) {
             const range = [];
             const visited = new Map();
+            const parent = new Map();  // 経路追跡用
             const queue = [{ x: unit.x, y: unit.y, cost: 0 }];
-            visited.set(`${unit.x},${unit.y}`, 0);
+            const startKey = `${unit.x},${unit.y}`;
+            visited.set(startKey, 0);
+            parent.set(startKey, null);
 
             while (queue.length > 0) {
                 const current = queue.shift();
+                const currentKey = `${current.x},${current.y}`;
 
                 // 隣接4方向
                 const directions = [
@@ -441,9 +450,23 @@
                     if (unitAtPos) continue;
 
                     visited.set(key, totalCost);
+                    parent.set(key, currentKey);  // 親を記録
                     queue.push({ x: nx, y: ny, cost: totalCost });
                     range.push({ x: nx, y: ny });
                 }
+            }
+
+            // 各目的地への経路を構築
+            gameState.movePaths.clear();
+            for (const pos of range) {
+                const path = [];
+                let key = `${pos.x},${pos.y}`;
+                while (key !== null) {
+                    const [x, y] = key.split(',').map(Number);
+                    path.unshift({ x, y });
+                    key = parent.get(key);
+                }
+                gameState.movePaths.set(`${pos.x},${pos.y}`, path);
             }
 
             return range;
@@ -461,11 +484,14 @@
         });
 
         function handleClick(x, y) {
+            // アニメーション中は操作不可
+            if (gameState.movingUnit) return;
+
             // 選択中のユニットがあれば移動を試みる
             if (gameState.selectedUnit) {
                 const inRange = gameState.moveRange.some(pos => pos.x === x && pos.y === y);
                 if (inRange) {
-                    moveUnit(gameState.selectedUnit, x, y);
+                    startMoveAnimation(gameState.selectedUnit, x, y);
                     return;
                 }
             }
@@ -494,12 +520,54 @@
             render();
         }
 
-        function moveUnit(unit, x, y) {
-            unit.x = x;
-            unit.y = y;
-            unit.moved = true;
-            deselectUnit();
-            updateStatus(`${unit.type} が移動しました`);
+        function startMoveAnimation(unit, x, y) {
+            const path = gameState.movePaths.get(`${x},${y}`);
+            if (!path || path.length < 2) {
+                // 経路がない場合は即座に移動
+                unit.x = x;
+                unit.y = y;
+                unit.moved = true;
+                deselectUnit();
+                return;
+            }
+
+            // アニメーション開始
+            gameState.movingUnit = unit;
+            gameState.movePath = path;
+            gameState.moveIndex = 1;  // 0は開始位置なので1から
+            gameState.lastMoveTime = gameState.animationTime;
+
+            // 選択解除・移動範囲クリア
+            gameState.selectedUnit = null;
+            gameState.moveRange = [];
+            updateStatus(`${unit.type} が移動中...`);
+        }
+
+        function updateMoveAnimation() {
+            if (!gameState.movingUnit) return;
+
+            const MOVE_INTERVAL = 120;  // 1マス移動にかかる時間（ミリ秒）
+
+            if (gameState.animationTime - gameState.lastMoveTime >= MOVE_INTERVAL) {
+                const unit = gameState.movingUnit;
+                const path = gameState.movePath;
+                const index = gameState.moveIndex;
+
+                if (index < path.length) {
+                    // 次のマスに移動
+                    unit.x = path[index].x;
+                    unit.y = path[index].y;
+                    gameState.moveIndex++;
+                    gameState.lastMoveTime = gameState.animationTime;
+                } else {
+                    // 移動完了
+                    unit.moved = true;
+                    gameState.movingUnit = null;
+                    gameState.movePath = [];
+                    gameState.moveIndex = 0;
+                    updateStatus(`${unit.type} が移動しました`);
+                }
+            }
         }
 
         // ========================================
@@ -549,6 +617,7 @@
         // ========================================
         function animate(timestamp) {
             gameState.animationTime = timestamp;
+            updateMoveAnimation();
             render();
             requestAnimationFrame(animate);
         }
